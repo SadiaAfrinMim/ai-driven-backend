@@ -9,7 +9,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  PORT: z.string().transform(Number).default(5000),
+  PORT: z.coerce.number().default(5000),
   DATABASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url().optional(),
   JWT_SECRET: z.string().min(1),
@@ -18,7 +18,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   REDIS_URL: z.string().url().optional(),
   REDIS_HOST: z.string().default("localhost"),
-  REDIS_PORT: z.string().transform(Number).default(6379),
+  REDIS_PORT: z.coerce.number().default(6379),
   REDIS_ENABLED: z.preprocess((val) => {
     if (typeof val === 'string') return val.toLowerCase() === 'true';
     if (typeof val === 'boolean') return val;

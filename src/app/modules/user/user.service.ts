@@ -106,10 +106,18 @@ const deleteUserAccount = async (userId: string): Promise<void> => {
   console.log('✅ User account deleted successfully');
 };
 
-const getAllUsers = async () => {
-  console.log('📋 Getting all users for admin');
+const getAllUsers = async (requesterRole?: string) => {
+  console.log('📋 Getting all users for role:', requesterRole);
+
+  const where: any = {};
+
+  // Managers can only see regular USER accounts
+  if (requesterRole === 'MANAGER') {
+    where.role = 'USER';
+  }
 
   const users = await prisma.user.findMany({
+    where,
     select: {
       id: true,
       name: true,

@@ -96,11 +96,11 @@ const getItems = async (
 
   const where: any = {}; 
 
-  // Temporarily disabled status filter to avoid enum DB error
-  // const includeAllFlag = filters.includeAll === true || filters.includeAll === 'true';
-  // if (!includeAllFlag) {
-  //   where.status = 'APPROVED';
-  // }
+  // Only show APPROVED items on public pages (includeAll=true for admin)
+  const includeAllFlag = filters.includeAll === true || filters.includeAll === 'true';
+  if (!includeAllFlag) {
+    where.status = 'APPROVED';
+  }
 
   // Search across several fields
   if (filters.search) {
@@ -112,6 +112,7 @@ const getItems = async (
   }
 
   if (filters.category) where.category = filters.category;
+  if (filters.status) where.status = filters.status;
   if (filters.location) where.location = { contains: filters.location, mode: 'insensitive' };
   if (filters.isAIContent !== undefined) where.isAIContent = filters.isAIContent;
 
@@ -134,19 +135,56 @@ const getItems = async (
   const sortBy = (pagination.sortBy as string) || 'createdAt';
   const sortOrder = (pagination.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-  const [result, total] = await Promise.all([
-    prisma.item.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { [sortBy]: sortOrder as any },
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        reviews: { select: { rating: true } },
-      },
-    }),
-    prisma.item.count({ where }),
-  ]);
+  let result: any[] = [];
+  let total = 0;
+  try {
+    const res = await Promise.all([
+      prisma.item.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder as any },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          reviews: { select: { rating: true } },
+        },
+      }),
+      prisma.item.count({ where }),
+    ]);
+    result = res[0];
+    total = res[1];
+  } catch (err) {
+    console.error('Prisma findMany/count failed, falling back to raw query:', err);
+    // Fallback: use raw SQL; include status filter if present to avoid returning all items
+    const allowedSortColumns = ['createdAt', 'price', 'rating', 'title', 'updatedAt'];
+    const orderCol = allowedSortColumns.includes(sortBy) ? sortBy : 'createdAt';
+    const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+    // Build WHERE clause safely for fallback raw query
+    let whereClause = '';
+    if (where && where.status) {
+      const allowedStatuses = ['PENDING', 'APPROVED', 'REJECT'];
+      if (allowedStatuses.includes(where.status)) {
+        whereClause = `WHERE "status" = '${where.status}'`;
+      }
+    }
+
+    // Use $queryRawUnsafe with sanitized column and numeric values only
+    const itemsQuery = `SELECT * FROM "Item" ${whereClause} ORDER BY "${orderCol}" ${order} LIMIT ${Number(limit)} OFFSET ${Number(skip)}`;
+    const countQuery = `SELECT COUNT(*)::int as count FROM "Item" ${whereClause}`;
+    try {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const itemsRaw: any[] = await prisma.$queryRawUnsafe(itemsQuery);
+      // @ts-ignore
+      const countRaw: any[] = await prisma.$queryRawUnsafe(countQuery);
+      result = itemsRaw;
+      total = countRaw && countRaw[0] && (countRaw[0].count ?? countRaw[0].count) ? Number(countRaw[0].count) : itemsRaw.length;
+    } catch (rawErr) {
+      console.error('Raw query fallback also failed:', rawErr);
+      throw rawErr;
+    }
+  }
 
   const totalPages = Math.ceil(total / limit);
 
@@ -325,18 +363,49 @@ const deleteItem = async (itemId: string, userId: string): Promise<void> => {
 const getMyItems = async (userId: string, pagination: IItemPagination = {}): Promise<IItemResponse> => {
   console.log('🔍 Getting my items for user:', userId);
 
-  const filters: IItemFilters = { ownerId: userId };
-  return getItems(filters, pagination);
+  const page = Number(pagination.page) || 1;
+  const limit = Number(pagination.limit) || 10;
+  const skip = (page - 1) * limit;
+  const sortBy = (pagination.sortBy as string) || 'createdAt';
+  const sortOrder = (pagination.sortOrder as string) === 'asc' ? 'asc' : 'desc';
+
+  const items = await prisma.item.findMany({
+    where: { ownerId: userId },
+    skip,
+    take: limit,
+    orderBy: { [sortBy]: sortOrder as any },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+      reviews: { select: { rating: true } },
+    },
+  });
+
+  const total = await prisma.item.count({ where: { ownerId: userId } });
+
+  return {
+    items: items as IItem[],
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };
 
 const getPendingItems = async () => {
-  return prisma.item.findMany({
-    where: { status: 'PENDING' } as any,
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  try {
+    return await prisma.item.findMany({
+      where: { status: 'PENDING' } as any,
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    console.error('Error fetching pending items:', error);
+    throw new Error('Failed to fetch pending items');
+  }
 };
 
 const updateItemStatus = async (itemId: string, status: string) => {

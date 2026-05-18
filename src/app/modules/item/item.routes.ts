@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Public routes (no authentication required)
 router.get('/', itemController.getItems);
+router.get('/approved', itemController.getApprovedItems);
 
 // Authenticated routes (authentication required)
 router.use(auth()); // All routes below require authentication

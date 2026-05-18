@@ -20,6 +20,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
+      "http://localhost:3001",
       "https://ai-project-flax-ten.vercel.app",
     ],
     credentials: true,

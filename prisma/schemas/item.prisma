@@ -1,7 +1,7 @@
 enum ItemStatus {
   PENDING
   APPROVED
-  REJECTED
+  REJECT
 }
 
 model Item {
