@@ -1,0 +1,24 @@
+enum UserRole {
+  USER
+  ADMIN
+  MANAGER
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          UserRole  @default(USER)
+  profileImage  String?
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relationships
+  items         Item[]
+  reviews       Review[]
+  blogs         Blog[]
+  chatHistory   ChatHistory[]
+  notifications Notification[]
+}

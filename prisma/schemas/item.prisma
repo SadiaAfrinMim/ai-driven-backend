@@ -1,0 +1,28 @@
+enum ItemStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Item {
+  id          String      @id @default(uuid())
+  title       String
+  description String      @db.Text
+  price       Float
+  quantity    Int         @default(0)
+  location    String
+  rating      Float       @default(0)
+  category    String
+  tags        String[]
+  images      String[]
+  isAIContent Boolean     @default(false)
+
+  status      ItemStatus  @default(PENDING)
+
+  ownerId     String
+  owner       User        @relation(fields: [ownerId], references: [id])
+  reviews     Review[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
