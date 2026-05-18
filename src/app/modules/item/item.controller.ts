@@ -106,6 +106,8 @@ const getItems = catchAsync(async (req: Request, res: Response) => {
     location: req.query.location as string,
     isAIContent: req.query.isAIContent ? req.query.isAIContent === 'true' : undefined,
     tags: req.query.tags ? (req.query.tags as string).split(',') : undefined,
+    includeAll: req.query.includeAll as string | boolean | undefined,
+    status: req.query.status as string | undefined,
   };
 
   const pagination: IItemPagination = {
@@ -121,6 +123,28 @@ const getItems = catchAsync(async (req: Request, res: Response) => {
 
   console.log('✅ Items retrieved successfully');
   sendResponse(res, 200, true, 'Items retrieved successfully', result);
+});
+
+// Public: Get only approved items
+const getApprovedItems = catchAsync(async (req: Request, res: Response) => {
+  const filters: IItemFilters = {
+    search: req.query.search as string,
+    category: req.query.category as string,
+    minPrice: req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined,
+    maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined,
+    location: req.query.location as string,
+    status: 'APPROVED',
+  };
+
+  const pagination: IItemPagination = {
+    page: req.query.page ? parseInt(req.query.page as string) : 1,
+    limit: req.query.limit ? parseInt(req.query.limit as string) : 12,
+    sortBy: req.query.sortBy as string,
+    sortOrder: req.query.sortOrder === 'asc' ? 'asc' : 'desc',
+  };
+
+  const result = await itemService.getItems(filters, pagination);
+  sendResponse(res, 200, true, 'Approved items retrieved successfully', result);
 });
 
 const getItemById = catchAsync(async (req: Request, res: Response) => {
@@ -193,13 +217,14 @@ const approveItem = catchAsync(async (req: Request, res: Response) => {
 // Admin: Reject item
 const rejectItem = catchAsync(async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const result = await itemService.updateItemStatus(id, 'REJECTED');
+  const result = await itemService.updateItemStatus(id, 'REJECT');
   sendResponse(res, 200, true, 'Item rejected', result);
 });
 
 export const itemController = {
   createItem,
   getItems,
+  getApprovedItems,
   getItemById,
   updateItem,
   deleteItem,

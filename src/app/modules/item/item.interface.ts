@@ -52,6 +52,7 @@ export interface IItemFilters {
   isAIContent?: boolean;
   tags?: string[];
   includeAll?: boolean | string; // admin flag to include non-approved items
+  status?: string;
 }
 
 export interface IUpdateItem {
