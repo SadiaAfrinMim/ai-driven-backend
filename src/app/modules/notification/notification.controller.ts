@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { catchAsync } from '../../../utils/catchAsync';
-import { sendResponse } from '../../../shared/sendResponse';
+import catchAsync from '../../../utils/catchAsync';
+import sendResponse from '../../../shared/sendResponse';
 import { notificationService } from './notification.service';
 
 /**
@@ -32,7 +32,7 @@ const getUnreadCount = catchAsync(async (req: Request, res: Response) => {
  * Mark notification as read
  */
 const markAsRead = catchAsync(async (req: Request, res: Response) => {
-  const notificationId = req.params.id;
+  const notificationId = req.params.id as string;
   const userId = (req as any).user.id;
   
   await notificationService.markAsRead(notificationId, userId);
@@ -53,7 +53,7 @@ const markAllAsRead = catchAsync(async (req: Request, res: Response) => {
  * Delete notification
  */
 const deleteNotification = catchAsync(async (req: Request, res: Response) => {
-  const notificationId = req.params.id;
+  const notificationId = req.params.id as string;
   const userId = (req as any).user.id;
   
   await notificationService.deleteNotification(notificationId, userId);
