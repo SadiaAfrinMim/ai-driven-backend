@@ -4,6 +4,7 @@ import userRoutes from '../modules/user/user.routes';
 import itemRoutes from '../modules/item/item.routes';
 import aiRoutes from '../modules/ai/ai.routes';
 import reviewRoutes from '../modules/review/review.routes';
+import notificationRoutes from '../modules/notification/notification.routes';
 
 const router = express.Router();
 
@@ -32,5 +33,6 @@ router.use('/users', userRoutes);
 router.use('/items', itemRoutes);
 router.use('/ai', aiRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/notifications', notificationRoutes);
 
 export { router as BaseRouter };
