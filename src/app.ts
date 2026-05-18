@@ -16,10 +16,15 @@ cacheService.connect().catch(err => {
 
 // Security middlewares
 app.use(helmet());
-app.use(cors({
-  origin: true, // Allow all origins for development
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      " https://ai-project-flax-ten.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
