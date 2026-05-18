@@ -8,13 +8,13 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 // Rate limiter for API endpoints
 exports.apiLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: process.env.NODE_ENV === 'development' ? 500 : 100,
     message: {
         success: false,
         message: 'Too many requests from this IP, please try again later.',
     },
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 // Stricter limiter for authentication endpoints
 exports.authLimiter = (0, express_rate_limit_1.default)({

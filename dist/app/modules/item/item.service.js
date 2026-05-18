@@ -5,9 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.itemService = void 0;
 const database_1 = __importDefault(require("../../../config/database"));
-const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const cloudinary_1 = require("../../../shared/cloudinary");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+const ai_service_1 = require("../ai/ai.service");
 const createItem = async (userId, payload, files) => {
     console.log('🔄 Creating item for user:', userId, payload);
     let imageUrls = [];
@@ -33,9 +33,28 @@ const createItem = async (userId, payload, files) => {
             throw new ApiError_1.default(400, 'Failed to process images');
         }
     }
-    // Ensure we have at least one image URL
-    if (imageUrls.length === 0) {
-        throw new ApiError_1.default(400, 'Failed to process images');
+    // Images are optional — continue even if no images were uploaded
+    // If AI generation is requested, generate description and tags
+    if (payload.isAIContent) {
+        try {
+            const aiRequest = {
+                type: 'item-description',
+                topic: payload.title,
+                keywords: payload.tags,
+                category: payload.category,
+            };
+            const aiResult = await ai_service_1.aiService.generateItemContent(aiRequest);
+            if (aiResult.title && !payload.title)
+                payload.title = aiResult.title;
+            if (aiResult.description && !payload.description)
+                payload.description = aiResult.description;
+            if (aiResult.tags && aiResult.tags.length > 0)
+                payload.tags = [...new Set([...(payload.tags || []), ...aiResult.tags])];
+            console.log('✅ AI generated content applied to item:', { title: payload.title, tags: payload.tags });
+        }
+        catch (err) {
+            console.error('❌ AI generation failed, continuing without AI content:', err);
+        }
     }
     const item = await database_1.default.item.create({
         data: {
@@ -43,10 +62,12 @@ const createItem = async (userId, payload, files) => {
             description: payload.description,
             price: payload.price,
             location: payload.location,
-            category: payload.category,
+            category: payload.category || 'uncategorized',
             tags: payload.tags || [],
-            images: imageUrls, // Store Cloudinary URLs
+            images: imageUrls,
             isAIContent: payload.isAIContent || false,
+            quantity: 1,
+            status: 'PENDING',
             ownerId: userId,
         },
         include: {
@@ -64,73 +85,71 @@ const createItem = async (userId, payload, files) => {
 };
 const getItems = async (filters = {}, pagination = {}) => {
     console.log('🔍 Getting items with filters:', filters, 'pagination:', pagination);
-    // Create query object for QueryBuilder
-    const query = {
-        ...filters,
-        ...pagination,
-    };
-    // Rename properties to match QueryBuilder expectations
-    if (filters.search)
-        query.searchTerm = filters.search;
-    if (pagination.sortBy)
-        query.sort = pagination.sortBy;
-    if (pagination.sortOrder)
-        query.sortOrder = pagination.sortOrder;
-    // Handle price range filters
-    if (filters.minPrice !== undefined)
-        query.min_price = filters.minPrice;
-    if (filters.maxPrice !== undefined)
-        query.max_price = filters.maxPrice;
-    // Create QueryBuilder instance
-    const itemQuery = new QueryBuilder_1.default(database_1.default.item.findMany({
-        include: {
-            owner: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                },
+    const where = {};
+    // By default only include APPROVED items unless includeAll flag is explicitly true
+    const includeAllFlag = filters.includeAll === true || filters.includeAll === 'true';
+    if (!includeAllFlag) {
+        where.status = 'APPROVED';
+    }
+    else {
+        // explicitly allow admin to pass includeAll=true
+    }
+    // Search across several fields
+    if (filters.search) {
+        where.OR = [
+            { title: { contains: filters.search, mode: 'insensitive' } },
+            { description: { contains: filters.search, mode: 'insensitive' } },
+            { category: { contains: filters.search, mode: 'insensitive' } },
+        ];
+    }
+    if (filters.category)
+        where.category = filters.category;
+    if (filters.location)
+        where.location = { contains: filters.location, mode: 'insensitive' };
+    if (filters.isAIContent !== undefined)
+        where.isAIContent = filters.isAIContent;
+    // price range
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+        where.price = {};
+        if (filters.minPrice !== undefined)
+            where.price.gte = filters.minPrice;
+        if (filters.maxPrice !== undefined)
+            where.price.lte = filters.maxPrice;
+    }
+    // tags (array of strings)
+    if (filters.tags && filters.tags.length > 0) {
+        where.tags = { hasSome: filters.tags };
+    }
+    const page = Number(pagination.page) || 1;
+    const limit = Number(pagination.limit) || 10;
+    const skip = (page - 1) * limit;
+    const sortBy = pagination.sortBy || 'createdAt';
+    const sortOrder = pagination.sortOrder === 'asc' ? 'asc' : 'desc';
+    const [result, total] = await Promise.all([
+        database_1.default.item.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { [sortBy]: sortOrder },
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+                reviews: { select: { rating: true } },
             },
-            reviews: {
-                select: {
-                    rating: true,
-                },
-            },
-        },
-    }), query);
-    // Apply QueryBuilder methods
-    const result = await itemQuery
-        .search(['title', 'description', 'category'])
-        .filter()
-        .sort()
-        .paginate()
-        .fields()
-        .modelQuery;
-    // Get total count with same filters
-    const countQuery = new QueryBuilder_1.default(database_1.default.item.count(), query);
-    const total = await countQuery
-        .search(['title', 'description', 'category'])
-        .filter()
-        .modelQuery;
-    // Calculate pagination metadata
-    const { page = 1, limit = 10 } = pagination;
+        }),
+        database_1.default.item.count({ where }),
+    ]);
     const totalPages = Math.ceil(total / limit);
-    // Calculate average rating for each item
     const itemsWithRating = result.map((item) => ({
         ...item,
-        rating: item.reviews.length > 0
+        rating: item.reviews && item.reviews.length > 0
             ? item.reviews.reduce((sum, review) => sum + review.rating, 0) / item.reviews.length
             : 0,
+        reviewCount: item.reviews ? item.reviews.length : 0,
     }));
     console.log(`✅ Retrieved ${result.length} items (page ${page}/${totalPages})`);
     return {
         items: itemsWithRating,
-        meta: {
-            page,
-            limit,
-            total,
-            totalPages,
-        },
+        meta: { page, limit, total, totalPages },
     };
 };
 const getItemById = async (itemId) => {
@@ -276,6 +295,21 @@ const getMyItems = async (userId, pagination = {}) => {
     const filters = { ownerId: userId };
     return getItems(filters, pagination);
 };
+const getPendingItems = async () => {
+    return database_1.default.item.findMany({
+        where: { status: 'PENDING' },
+        include: {
+            owner: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+};
+const updateItemStatus = async (itemId, status) => {
+    return database_1.default.item.update({
+        where: { id: itemId },
+        data: { status },
+    });
+};
 exports.itemService = {
     createItem,
     getItems,
@@ -283,4 +317,6 @@ exports.itemService = {
     updateItem,
     deleteItem,
     getMyItems,
+    getPendingItems,
+    updateItemStatus,
 };

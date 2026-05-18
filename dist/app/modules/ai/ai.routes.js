@@ -56,4 +56,9 @@ router.post('/generate-blog', (0, validateRequest_1.default)(ai_validation_1.aiV
 router.get('/chat-history', ai_controller_1.aiController.getChatHistory);
 // Insights - MANAGER, ADMIN
 router.get('/insights', (0, auth_1.default)('MANAGER', 'ADMIN'), ai_controller_1.aiController.getInsights);
+// Advanced trending features 2026
+router.post('/analyze-trends', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), ai_controller_1.aiController.analyzeTrends);
+router.post('/analyze-sentiment', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), ai_controller_1.aiController.analyzeSentiment);
+// Generate AI review text
+router.post('/generate-review', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), ai_controller_1.aiController.generateReview);
 exports.default = router;

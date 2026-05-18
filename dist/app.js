@@ -19,7 +19,10 @@ CacheService_1.cacheService.connect().catch(err => {
 // Security middlewares
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
-    origin: true, // Allow all origins for development
+    origin: [
+        "http://localhost:3000",
+        "https://ai-project-flax-ten.vercel.app",
+    ],
     credentials: true,
 }));
 // Body parser

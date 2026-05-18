@@ -13,7 +13,12 @@ const validateRequest = (schema) => {
                 'content-type': req.headers['content-type'],
                 'authorization': req.headers.authorization ? 'Bearer ***' : 'None'
             });
-            const result = schema.safeParse(req.body);
+            // First try parsing directly
+            let result = schema.safeParse(req.body);
+            // If that fails, try wrapping body (some schemas expect { body: {...} })
+            if (!result.success) {
+                result = schema.safeParse({ body: req.body });
+            }
             if (!result.success) {
                 console.log('🔍 Zod validation error:', result.error);
                 console.log('🔍 Zod issues details:', JSON.stringify(result.error.issues, null, 2));

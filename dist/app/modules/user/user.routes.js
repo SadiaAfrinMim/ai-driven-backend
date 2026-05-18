@@ -17,6 +17,6 @@ router.get('/stats', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), user_contr
 // Delete account - USER, MANAGER, ADMIN can delete their own account
 router.delete('/account', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), user_controller_1.userController.deleteAccount);
 // Admin only routes - ADMIN role required
-router.get('/all-users', (0, auth_1.default)('ADMIN'), user_controller_1.userController.getAllUsers);
+router.get('/all-users', (0, auth_1.default)('ADMIN', 'MANAGER'), user_controller_1.userController.getAllUsers);
 router.patch('/update-role', (0, auth_1.default)('ADMIN'), user_controller_1.userController.updateUserRole);
 exports.default = router;

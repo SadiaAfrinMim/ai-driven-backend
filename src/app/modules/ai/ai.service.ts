@@ -57,14 +57,18 @@ const aiService = {
     const response = await enhancedAIService.processChat(request);
     const conversationId = request.conversationId || `conv_${Date.now()}`;
 
-    // Save to chat history
-    await prisma.chatHistory.create({
-      data: {
-        message: request.message,
-        response,
-        userId,
-      },
-    });
+    // Save to chat history (non-blocking - don't fail chat if DB write fails)
+    try {
+      await prisma.chatHistory.create({
+        data: {
+          message: request.message,
+          response,
+          userId,
+        },
+      });
+    } catch (dbError) {
+      console.warn('⚠️ Failed to save chat history (non-critical):', dbError);
+    }
 
     return {
       response,

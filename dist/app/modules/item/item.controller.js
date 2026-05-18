@@ -26,13 +26,24 @@ const createItem = (0, catchAsync_1.default)(async (req, res) => {
         });
     }
     // Validate required fields
-    const { title, description, price, location, category } = parsedData;
+    const { title, description, price, location } = parsedData;
+    // If category not provided, default to 'uncategorized' for AI generation/storage
+    let category = parsedData.category || 'uncategorized';
     const errors = [];
     if (!title || typeof title !== 'string' || title.trim().length < 3) {
         errors.push('Title must be at least 3 characters');
     }
-    if (!description || typeof description !== 'string' || description.trim().length < 10) {
-        errors.push('Description must be at least 10 characters');
+    // If AI-generated content is enabled, description may be empty and will be filled later
+    if (!parsedData.isAIContent) {
+        if (!description || typeof description !== 'string' || description.trim().length < 10) {
+            errors.push('Description must be at least 10 characters');
+        }
+    }
+    else {
+        // If AI content is enabled and description is present, still validate minimum length
+        if (description && typeof description === 'string' && description.trim().length > 0 && description.trim().length < 10) {
+            errors.push('Description must be at least 10 characters');
+        }
     }
     if (!price || isNaN(Number(price)) || Number(price) <= 0) {
         errors.push('Price must be a valid positive number');
@@ -40,21 +51,19 @@ const createItem = (0, catchAsync_1.default)(async (req, res) => {
     if (!location || typeof location !== 'string' || location.trim().length < 2) {
         errors.push('Location must be at least 2 characters');
     }
-    if (!category || typeof category !== 'string' || category.trim().length < 2) {
-        errors.push('Category must be at least 2 characters');
+    // Category is optional; if not provided and not AI content, require it
+    if (!parsedData.isAIContent) {
+        if (!category || typeof category !== 'string' || category.trim().length < 2) {
+            errors.push('Category must be at least 2 characters');
+        }
     }
-    // For development, make images optional
-    // // Validate that both text data AND images are present
-    // if (errors.length === 0) {
-    //   if (imageFiles.length === 0) {
-    //     errors.push('At least one image is required along with text data');
-    //   }
-    // }
-    // // If text data is missing, images alone are not enough
-    // const hasTextData = title && description && price && location && category;
-    // if (!hasTextData && imageFiles.length > 0) {
-    //   errors.push('Text data (title, description, price, location, category) is required along with images');
-    // }
+    else {
+        // AI content: category optional; if provided, validate length
+        if (category && (typeof category !== 'string' || category.trim().length < 2)) {
+            errors.push('Category must be at least 2 characters');
+        }
+    }
+    // Images are optional in development — no additional validation required here
     if (errors.length > 0) {
         console.log('❌ Validation errors:', errors);
         return res.status(400).json({
@@ -140,6 +149,23 @@ const getMyItems = (0, catchAsync_1.default)(async (req, res) => {
     console.log('✅ My items retrieved successfully');
     (0, sendResponse_1.default)(res, 200, true, 'My items retrieved successfully', result);
 });
+// Admin: Get pending items
+const getPendingItems = (0, catchAsync_1.default)(async (req, res) => {
+    const result = await item_service_1.itemService.getPendingItems();
+    (0, sendResponse_1.default)(res, 200, true, 'Pending items retrieved', result);
+});
+// Admin: Approve item
+const approveItem = (0, catchAsync_1.default)(async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const result = await item_service_1.itemService.updateItemStatus(id, 'APPROVED');
+    (0, sendResponse_1.default)(res, 200, true, 'Item approved successfully', result);
+});
+// Admin: Reject item
+const rejectItem = (0, catchAsync_1.default)(async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const result = await item_service_1.itemService.updateItemStatus(id, 'REJECTED');
+    (0, sendResponse_1.default)(res, 200, true, 'Item rejected', result);
+});
 exports.itemController = {
     createItem,
     getItems,
@@ -147,4 +173,7 @@ exports.itemController = {
     updateItem,
     deleteItem,
     getMyItems,
+    getPendingItems,
+    approveItem,
+    rejectItem,
 };

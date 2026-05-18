@@ -22,7 +22,14 @@ const generateItemContent = (0, catchAsync_1.default)(async (req, res) => {
     (0, sendResponse_1.default)(res, 200, true, 'Item content generated successfully', result);
 });
 const getRecommendations = (0, catchAsync_1.default)(async (req, res) => {
-    const userId = req.user.id;
+    // Prefer authenticated user id, but allow userId in query for debugging/fallback
+    const authUser = req.user;
+    const queryUserId = req.query.userId;
+    const userId = authUser?.id || queryUserId;
+    if (!userId) {
+        console.log('⚠️ Recommendation request without userId - returning empty');
+        return (0, sendResponse_1.default)(res, 200, true, 'No user context, no recommendations', { recommendations: [] });
+    }
     const requestData = {
         userId,
         context: req.query.context,
@@ -32,7 +39,7 @@ const getRecommendations = (0, catchAsync_1.default)(async (req, res) => {
     };
     console.log('🎯 Recommendation request:', requestData);
     const result = await ai_service_1.aiService.getRecommendations(requestData);
-    console.log('✅ Recommendations generated successfully');
+    console.log('✅ Recommendations generated successfully - count:', result.recommendations.length);
     (0, sendResponse_1.default)(res, 200, true, 'Recommendations retrieved successfully', result);
 });
 const chatWithAI = (0, catchAsync_1.default)(async (req, res) => {
@@ -80,6 +87,20 @@ const getInsights = (0, catchAsync_1.default)(async (req, res) => {
     console.log('✅ Insights retrieved successfully');
     (0, sendResponse_1.default)(res, 200, true, 'AI insights retrieved successfully', result);
 });
+// Advanced 2026 trending AI features
+const analyzeTrends = (0, catchAsync_1.default)(async (req, res) => {
+    const result = await ai_service_1.aiService.analyzeTrends(req.body);
+    (0, sendResponse_1.default)(res, 200, true, 'Trend analysis completed', result);
+});
+const analyzeSentiment = (0, catchAsync_1.default)(async (req, res) => {
+    const result = await ai_service_1.aiService.analyzeSentiment(req.body);
+    (0, sendResponse_1.default)(res, 200, true, 'Sentiment analysis completed', result);
+});
+const generateReview = (0, catchAsync_1.default)(async (req, res) => {
+    const { productName, rating } = req.body;
+    const result = await ai_service_1.aiService.generateReviewText(productName, rating);
+    (0, sendResponse_1.default)(res, 200, true, 'Review generated successfully', result);
+});
 exports.aiController = {
     generateContent,
     generateItemContent,
@@ -89,4 +110,7 @@ exports.aiController = {
     generateBlog,
     getChatHistory,
     getInsights,
+    analyzeTrends,
+    analyzeSentiment,
+    generateReview,
 };
