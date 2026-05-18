@@ -1,0 +1,8 @@
+model AIInsight {
+  id        String   @id @default(uuid())
+  topic     String   // e.g., "Monthly Sales Analysis"
+  insight   String   @db.Text // AI generated summary
+  chartData Json?    // JSON format data for frontend charts
+
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,19 @@
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType  // info, success, warning, error
+  isRead    Boolean   @default(false)
+  relatedId String?   // Optional ID of related entity (item, review, etc.)
+  relatedType String? // Type of related entity (ITEM, REVIEW, etc.)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
