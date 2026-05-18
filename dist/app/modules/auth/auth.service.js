@@ -44,14 +44,26 @@ const createUser = async (payload) => {
             },
         });
         console.log('✅ User created successfully:', { id: user.id, name: user.name, email: user.email });
-        // Return user without password
-        return {
+        // Generate JWT token for immediate login after registration
+        const jwtPayload = {
             id: user.id,
-            name: user.name,
             email: user.email,
             role: user.role,
-            profileImage: user.profileImage,
-            bio: user.bio,
+        };
+        const accessToken = jsonwebtoken_1.default.sign(jwtPayload, process.env.JWT_SECRET, {
+            expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '1d',
+        });
+        // Return user + token (so frontend can auto-login)
+        return {
+            accessToken,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                profileImage: user.profileImage,
+                bio: user.bio,
+            },
         };
     }
     catch (error) {

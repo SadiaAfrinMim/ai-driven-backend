@@ -10,6 +10,7 @@ const user_routes_1 = __importDefault(require("../modules/user/user.routes"));
 const item_routes_1 = __importDefault(require("../modules/item/item.routes"));
 const ai_routes_1 = __importDefault(require("../modules/ai/ai.routes"));
 const review_routes_1 = __importDefault(require("../modules/review/review.routes"));
+const notification_routes_1 = __importDefault(require("../modules/notification/notification.routes"));
 const router = express_1.default.Router();
 exports.BaseRouter = router;
 // Health check
@@ -35,3 +36,4 @@ router.use('/users', user_routes_1.default);
 router.use('/items', item_routes_1.default);
 router.use('/ai', ai_routes_1.default);
 router.use('/reviews', review_routes_1.default);
+router.use('/notifications', notification_routes_1.default);

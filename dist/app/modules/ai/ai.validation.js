@@ -13,10 +13,11 @@ const contentGenerationValidationSchema = zod_1.z.object({
     price: zod_1.z.number().optional(),
 });
 const recommendationValidationSchema = zod_1.z.object({
-    context: zod_1.z.enum(['browse', 'search', 'profile', 'similar']).optional(),
+    userId: zod_1.z.string().optional(),
+    context: zod_1.z.enum(['browse', 'search', 'profile', 'similar', 'dashboard']).optional(),
     searchQuery: zod_1.z.string().optional(),
     category: zod_1.z.string().optional(),
-    limit: zod_1.z.string().transform(val => val ? parseInt(val) : 10).optional(),
+    limit: zod_1.z.string().optional().transform(val => val ? parseInt(val) : 10),
 });
 const chatValidationSchema = zod_1.z.object({
     message: zod_1.z.string().min(1, 'Message cannot be empty').max(2000, 'Message too long'),
