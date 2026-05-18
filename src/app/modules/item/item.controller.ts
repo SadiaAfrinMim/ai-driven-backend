@@ -127,6 +127,14 @@ const getItems = catchAsync(async (req: Request, res: Response) => {
 
 // Public: Get only approved items
 const getApprovedItems = catchAsync(async (req: Request, res: Response) => {
+  console.log('📨 getApprovedItems called - headers:', {
+    origin: req.headers.origin,
+    host: req.headers.host,
+    ua: req.headers['user-agent'],
+    auth: req.headers.authorization,
+    query: req.query,
+  });
+
   const filters: IItemFilters = {
     search: req.query.search as string,
     category: req.query.category as string,
