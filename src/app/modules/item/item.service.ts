@@ -96,13 +96,11 @@ const getItems = async (
 
   const where: any = {}; 
 
-  // By default only include APPROVED items unless includeAll flag is explicitly true
-  const includeAllFlag = filters.includeAll === true || filters.includeAll === 'true';
-  if (!includeAllFlag) {
-    where.status = 'APPROVED';
-  } else {
-    // explicitly allow admin to pass includeAll=true
-  }
+  // Temporarily disabled status filter to avoid enum DB error
+  // const includeAllFlag = filters.includeAll === true || filters.includeAll === 'true';
+  // if (!includeAllFlag) {
+  //   where.status = 'APPROVED';
+  // }
 
   // Search across several fields
   if (filters.search) {
