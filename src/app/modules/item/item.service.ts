@@ -5,6 +5,7 @@ import { IItem, ICreateItem, IUpdateItem, IItemFilters, IItemPagination, IItemRe
 import ApiError from '../../../errors/ApiError';
 import { aiService } from '../ai/ai.service';
 import { IContentGenerationRequest } from '../ai/ai.interface';
+import { ItemStatus } from '@prisma/client';
 
 const createItem = async (userId: string, payload: ICreateItem, files?: { buffer: Buffer; mimetype: string }[]): Promise<IItem> => {
   console.log('🔄 Creating item for user:', userId, payload);
@@ -163,7 +164,7 @@ const getItems = async (
     // Build WHERE clause safely for fallback raw query
     let whereClause = '';
     if (where && where.status) {
-      const allowedStatuses = ['PENDING', 'APPROVED', 'REJECT'];
+      const allowedStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
       if (allowedStatuses.includes(where.status)) {
         whereClause = `WHERE "status" = '${where.status}'`;
       }
@@ -396,7 +397,7 @@ const getMyItems = async (userId: string, pagination: IItemPagination = {}): Pro
 const getPendingItems = async () => {
   try {
     return await prisma.item.findMany({
-      where: { status: 'PENDING' } as any,
+      where: { status: ItemStatus.PENDING },
       include: {
         owner: { select: { id: true, name: true, email: true } },
       },
@@ -409,11 +410,32 @@ const getPendingItems = async () => {
 };
 
 const updateItemStatus = async (itemId: string, status: string) => {
-  return prisma.item.update({
+  // Prisma enum is ItemStatus: PENDING | APPROVED | REJECTED
+  // Ensure we only send valid enum values to Postgres.
+  const normalized = status.trim().toUpperCase();
+  const allowedStatuses: Array<ItemStatus> = [ItemStatus.PENDING, ItemStatus.APPROVED, ItemStatus.REJECTED];
+  const isAllowed = allowedStatuses.includes(normalized as ItemStatus);
+
+  if (!isAllowed) {
+    throw new ApiError(400, `Invalid item status: ${status}`);
+  }
+
+  const existingItem = await prisma.item.findUnique({
     where: { id: itemId },
-    data: { status } as any,
   });
+
+  if (!existingItem) {
+    throw new ApiError(404, 'Item not found');
+  }
+
+  await prisma.item.update({
+    where: { id: itemId },
+    data: { status: normalized as ItemStatus },
+  });
+
+  return prisma.item.findUnique({ where: { id: itemId } });
 };
+
 
 export const itemService = {
   createItem,

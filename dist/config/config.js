@@ -13,7 +13,7 @@ const envSchema = zod_1.z.object({
     NODE_ENV: zod_1.z
         .enum(["development", "production", "test"])
         .default("development"),
-    PORT: zod_1.z.string().transform(Number).default(5000),
+    PORT: zod_1.z.coerce.number().default(5000),
     DATABASE_URL: zod_1.z.string().url(),
     FRONTEND_URL: zod_1.z.string().url().optional(),
     JWT_SECRET: zod_1.z.string().min(1),
@@ -22,7 +22,7 @@ const envSchema = zod_1.z.object({
     OPENAI_API_KEY: zod_1.z.string().min(1),
     REDIS_URL: zod_1.z.string().url().optional(),
     REDIS_HOST: zod_1.z.string().default("localhost"),
-    REDIS_PORT: zod_1.z.string().transform(Number).default(6379),
+    REDIS_PORT: zod_1.z.coerce.number().default(6379),
     REDIS_ENABLED: zod_1.z.preprocess((val) => {
         if (typeof val === 'string')
             return val.toLowerCase() === 'true';

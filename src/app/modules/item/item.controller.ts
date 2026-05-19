@@ -225,9 +225,11 @@ const approveItem = catchAsync(async (req: Request, res: Response) => {
 // Admin: Reject item
 const rejectItem = catchAsync(async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const result = await itemService.updateItemStatus(id, 'REJECT');
+  // Pass exact enum literal expected by Prisma/Postgres
+  const result = await itemService.updateItemStatus(id, 'REJECTED');
   sendResponse(res, 200, true, 'Item rejected', result);
 });
+
 
 export const itemController = {
   createItem,

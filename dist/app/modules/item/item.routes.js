@@ -10,6 +10,7 @@ const item_controller_1 = require("./item.controller");
 const router = express_1.default.Router();
 // Public routes (no authentication required)
 router.get('/', item_controller_1.itemController.getItems);
+router.get('/approved', item_controller_1.itemController.getApprovedItems);
 // Authenticated routes (authentication required)
 router.use((0, auth_1.default)()); // All routes below require authentication
 // Create item - MANAGER, ADMIN only

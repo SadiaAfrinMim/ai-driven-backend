@@ -38,8 +38,10 @@ const deleteAccount = (0, catchAsync_1.default)(async (req, res) => {
     (0, sendResponse_1.default)(res, 200, true, 'Account deleted successfully');
 });
 const getAllUsers = (0, catchAsync_1.default)(async (req, res) => {
-    console.log('📨 Get all users request by admin');
-    const result = await user_service_1.userService.getAllUsers();
+    const currentUser = req.user;
+    const currentUserRole = currentUser?.role;
+    console.log('📨 Get all users request by:', currentUserRole);
+    const result = await user_service_1.userService.getAllUsers(currentUserRole);
     console.log(`✅ Retrieved ${result.length} users`);
     (0, sendResponse_1.default)(res, 200, true, 'Users retrieved successfully', result);
 });

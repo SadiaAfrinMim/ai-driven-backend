@@ -46,6 +46,7 @@ const router = express_1.default.Router();
 router.post('/generate-content', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), (0, validateRequest_1.default)(ai_validation_1.aiValidations.contentGenerationValidationSchema), ai_controller_1.aiController.generateContent);
 // Generate item content - USER, MANAGER, ADMIN
 router.post('/generate-item-content', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), (0, validateRequest_1.default)(ai_validation_1.aiValidations.contentGenerationValidationSchema), ai_controller_1.aiController.generateItemContent);
+router.post('/discover', ai_controller_1.aiController.discoverProducts);
 // Other authenticated routes
 router.use((0, auth_1.default)()); // Apply auth middleware for all routes below
 router.get('/recommendations', (0, validateRequest_1.validateQuery)(ai_validation_1.aiValidations.recommendationValidationSchema), ai_controller_1.aiController.getRecommendations);

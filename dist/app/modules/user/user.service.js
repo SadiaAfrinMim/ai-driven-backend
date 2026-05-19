@@ -91,9 +91,15 @@ const deleteUserAccount = async (userId) => {
     });
     console.log('✅ User account deleted successfully');
 };
-const getAllUsers = async () => {
-    console.log('📋 Getting all users for admin');
+const getAllUsers = async (requesterRole) => {
+    console.log('📋 Getting all users for role:', requesterRole);
+    const where = {};
+    // Managers can only see regular USER accounts
+    if (requesterRole === 'MANAGER') {
+        where.role = 'USER';
+    }
     const users = await database_1.default.user.findMany({
+        where,
         select: {
             id: true,
             name: true,

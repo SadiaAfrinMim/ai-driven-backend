@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import catchAsync from '../../../utils/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { aiService } from './ai.service';
-import { IContentGenerationRequest, IRecommendationRequest, IChatRequest, IAnalyticsRequest } from './ai.interface';
+import { IContentGenerationRequest, IRecommendationRequest, IChatRequest, IAnalyticsRequest, IDiscoverProductsRequest } from './ai.interface';
 
 const generateContent = catchAsync(async (req: Request, res: Response) => {
   const requestData: IContentGenerationRequest = req.body;
@@ -51,6 +51,20 @@ const getRecommendations = catchAsync(async (req: Request, res: Response) => {
 
   console.log('✅ Recommendations generated successfully - count:', result.recommendations.length);
   sendResponse(res, 200, true, 'Recommendations retrieved successfully', result);
+});
+
+const discoverProducts = catchAsync(async (req: Request, res: Response) => {
+  const requestData: IDiscoverProductsRequest = {
+    query: req.body?.query,
+    category: req.body?.category,
+    vibe: req.body?.vibe,
+    budget: typeof req.body?.budget === 'number' ? req.body.budget : Number(req.body?.budget) || undefined,
+    tags: Array.isArray(req.body?.tags) ? req.body.tags : undefined,
+    limit: typeof req.body?.limit === 'number' ? req.body.limit : Number(req.body?.limit) || undefined,
+  };
+
+  const result = await aiService.discoverProducts(requestData);
+  sendResponse(res, 200, true, 'Product suggestions generated successfully', result);
 });
 
 
@@ -140,6 +154,7 @@ export const aiController = {
   generateContent,
   generateItemContent,
   getRecommendations,
+  discoverProducts,
   chatWithAI,
   generateAnalytics,
   generateBlog,

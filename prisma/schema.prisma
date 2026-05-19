@@ -38,7 +38,7 @@ model User {
 enum ItemStatus {
   PENDING
   APPROVED
-  REJECT
+  REJECTED
 }
 
 model Item {

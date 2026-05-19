@@ -33,11 +33,50 @@ export interface IRecommendationResponse {
     title: string;
     reason: string;
     score: number;
+    description?: string;
+    price?: number;
+    category?: string;
+    location?: string;
+    image?: string | null;
+    reviewCount?: number;
+    avgRating?: number;
+    tags?: string[];
   }>;
   metadata: {
     total: number;
     algorithm: string;
     generatedAt: Date;
+  };
+}
+
+export interface IDiscoverProductsRequest {
+  query?: string;
+  category?: string;
+  budget?: number;
+  vibe?: string;
+  tags?: string[];
+  limit?: number;
+}
+
+export interface IDiscoverProductsResponse {
+  suggestions: Array<{
+    itemId: string;
+    title: string;
+    description: string;
+    price: number;
+    category: string;
+    location: string;
+    image: string | null;
+    avgRating: number;
+    reviewCount: number;
+    tags: string[];
+    score: number;
+    reason: string;
+  }>;
+  metadata: {
+    total: number;
+    generatedAt: Date;
+    algorithm: string;
   };
 }
 

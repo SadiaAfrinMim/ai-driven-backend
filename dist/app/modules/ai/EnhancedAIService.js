@@ -11,7 +11,6 @@ exports.enhancedAIService = exports.EnhancedAIService = void 0;
 const database_1 = __importDefault(require("../../../config/database"));
 const AIProviderFactory_1 = require("./AIProviderFactory");
 const CacheService_1 = require("./CacheService");
-const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 class EnhancedAIService {
     constructor() {
         this.provider = 'openai';
@@ -358,7 +357,7 @@ class EnhancedAIService {
         }
         catch (error) {
             console.error('Recommendation generation error:', error);
-            throw new ApiError_1.default(500, 'Failed to generate recommendations');
+            return [];
         }
     }
     async processChat(request) {

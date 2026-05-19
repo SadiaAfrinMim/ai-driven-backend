@@ -100,6 +100,8 @@ const getItems = (0, catchAsync_1.default)(async (req, res) => {
         location: req.query.location,
         isAIContent: req.query.isAIContent ? req.query.isAIContent === 'true' : undefined,
         tags: req.query.tags ? req.query.tags.split(',') : undefined,
+        includeAll: req.query.includeAll,
+        status: req.query.status,
     };
     const pagination = {
         page: req.query.page ? parseInt(req.query.page) : 1,
@@ -111,6 +113,32 @@ const getItems = (0, catchAsync_1.default)(async (req, res) => {
     const result = await item_service_1.itemService.getItems(filters, pagination);
     console.log('✅ Items retrieved successfully');
     (0, sendResponse_1.default)(res, 200, true, 'Items retrieved successfully', result);
+});
+// Public: Get only approved items
+const getApprovedItems = (0, catchAsync_1.default)(async (req, res) => {
+    console.log('📨 getApprovedItems called - headers:', {
+        origin: req.headers.origin,
+        host: req.headers.host,
+        ua: req.headers['user-agent'],
+        auth: req.headers.authorization,
+        query: req.query,
+    });
+    const filters = {
+        search: req.query.search,
+        category: req.query.category,
+        minPrice: req.query.minPrice ? parseFloat(req.query.minPrice) : undefined,
+        maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice) : undefined,
+        location: req.query.location,
+        status: 'APPROVED',
+    };
+    const pagination = {
+        page: req.query.page ? parseInt(req.query.page) : 1,
+        limit: req.query.limit ? parseInt(req.query.limit) : 12,
+        sortBy: req.query.sortBy,
+        sortOrder: req.query.sortOrder === 'asc' ? 'asc' : 'desc',
+    };
+    const result = await item_service_1.itemService.getItems(filters, pagination);
+    (0, sendResponse_1.default)(res, 200, true, 'Approved items retrieved successfully', result);
 });
 const getItemById = (0, catchAsync_1.default)(async (req, res) => {
     const { id } = req.params;
@@ -163,12 +191,14 @@ const approveItem = (0, catchAsync_1.default)(async (req, res) => {
 // Admin: Reject item
 const rejectItem = (0, catchAsync_1.default)(async (req, res) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    // Pass exact enum literal expected by Prisma/Postgres
     const result = await item_service_1.itemService.updateItemStatus(id, 'REJECTED');
     (0, sendResponse_1.default)(res, 200, true, 'Item rejected', result);
 });
 exports.itemController = {
     createItem,
     getItems,
+    getApprovedItems,
     getItemById,
     updateItem,
     deleteItem,

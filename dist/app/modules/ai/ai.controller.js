@@ -42,6 +42,18 @@ const getRecommendations = (0, catchAsync_1.default)(async (req, res) => {
     console.log('✅ Recommendations generated successfully - count:', result.recommendations.length);
     (0, sendResponse_1.default)(res, 200, true, 'Recommendations retrieved successfully', result);
 });
+const discoverProducts = (0, catchAsync_1.default)(async (req, res) => {
+    const requestData = {
+        query: req.body?.query,
+        category: req.body?.category,
+        vibe: req.body?.vibe,
+        budget: typeof req.body?.budget === 'number' ? req.body.budget : Number(req.body?.budget) || undefined,
+        tags: Array.isArray(req.body?.tags) ? req.body.tags : undefined,
+        limit: typeof req.body?.limit === 'number' ? req.body.limit : Number(req.body?.limit) || undefined,
+    };
+    const result = await ai_service_1.aiService.discoverProducts(requestData);
+    (0, sendResponse_1.default)(res, 200, true, 'Product suggestions generated successfully', result);
+});
 const chatWithAI = (0, catchAsync_1.default)(async (req, res) => {
     const userId = req.user.id;
     const requestData = req.body;
@@ -105,6 +117,7 @@ exports.aiController = {
     generateContent,
     generateItemContent,
     getRecommendations,
+    discoverProducts,
     chatWithAI,
     generateAnalytics,
     generateBlog,

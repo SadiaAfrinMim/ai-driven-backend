@@ -410,7 +410,7 @@ export class EnhancedAIService {
       return top;
     } catch (error) {
       console.error('Recommendation generation error:', error);
-      throw new ApiError(500, 'Failed to generate recommendations');
+      return [];
     }
   }
 

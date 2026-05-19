@@ -22,6 +22,8 @@ router.post(
   aiController.generateItemContent
 );
 
+router.post('/discover', aiController.discoverProducts);
+
 // Other authenticated routes
 router.use(auth()); // Apply auth middleware for all routes below
 
