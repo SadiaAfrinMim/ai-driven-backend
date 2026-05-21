@@ -24,14 +24,15 @@ router.post(
 
 router.post('/discover', aiController.discoverProducts);
 
-// Other authenticated routes
-router.use(auth()); // Apply auth middleware for all routes below
-
+// Allow recommendations to be fetched with a query userId for debugging (no auth required)
 router.get(
   '/recommendations',
   validateQuery(aiValidations.recommendationValidationSchema),
   aiController.getRecommendations
 );
+
+// Other authenticated routes
+router.use(auth()); // Apply auth middleware for all routes below
 
 router.post(
   '/chat',

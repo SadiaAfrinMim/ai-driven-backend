@@ -346,6 +346,13 @@ export class EnhancedAIService {
           matchedTags,
           matchedCategory,
           avgRating,
+          description: item.description,
+          price: item.price,
+          category: item.category,
+          location: item.location,
+          image: item.images?.[0] || null,
+          reviewCount: item.reviews.length,
+          tags: item.tags,
         };
       });
 
@@ -396,6 +403,13 @@ export class EnhancedAIService {
                   matchedTags: [],
                   matchedCategory: false,
                   avgRating,
+                  description: item.description,
+                  price: item.price,
+                  category: item.category,
+                  location: item.location,
+                  image: item.images?.[0] || null,
+                  reviewCount: item.reviews.length,
+                  tags: item.tags,
                 };
               });
 
@@ -404,6 +418,7 @@ export class EnhancedAIService {
           }
         } catch (err) {
           console.error('AI recommendation fallback error:', err);
+           throw err;
         }
       }
 

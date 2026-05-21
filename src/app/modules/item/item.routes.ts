@@ -32,9 +32,9 @@ router.patch('/:id/reject', auth('ADMIN'), itemController.rejectItem);
 router.get('/:id', itemController.getItemById);
 router.patch(
   '/:id',
-  auth('MANAGER', 'ADMIN'),
+  auth(),
   itemController.updateItem
 );
-router.delete('/:id', auth('ADMIN'), itemController.deleteItem);
+router.delete('/:id', auth(), itemController.deleteItem);
 
 export default router;

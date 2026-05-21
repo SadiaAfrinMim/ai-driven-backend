@@ -21,7 +21,7 @@ export interface IContentGenerationResponse {
 
 export interface IRecommendationRequest {
   userId: string;
-  context?: 'browse' | 'search' | 'profile' | 'similar';
+  context?: 'browse' | 'search' | 'profile' | 'similar' | 'dashboard' | 'public';
   searchQuery?: string;
   category?: string;
   limit?: number;

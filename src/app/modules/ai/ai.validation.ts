@@ -13,7 +13,7 @@ const contentGenerationValidationSchema = z.object({
 
 const recommendationValidationSchema = z.object({
   userId: z.string().optional(),
-  context: z.enum(['browse', 'search', 'profile', 'similar', 'dashboard']).optional(),
+  context: z.enum(['browse', 'search', 'profile', 'similar', 'dashboard', 'public']).optional(),
   searchQuery: z.string().optional(),
   category: z.string().optional(),
   limit: z.string().optional().transform(val => val ? parseInt(val) : 10),

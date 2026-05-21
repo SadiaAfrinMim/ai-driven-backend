@@ -31,7 +31,7 @@ router.patch(
   reviewController.updateReview
 );
 
-// Delete review - MANAGER, ADMIN only
-router.delete('/:id', auth('MANAGER', 'ADMIN'), reviewController.deleteReview);
+// Delete review - Authenticated users can delete their own reviews
+router.delete('/:id', auth(), reviewController.deleteReview);
 
 export default router;

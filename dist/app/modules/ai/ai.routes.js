@@ -47,9 +47,10 @@ router.post('/generate-content', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN')
 // Generate item content - USER, MANAGER, ADMIN
 router.post('/generate-item-content', (0, auth_1.default)('USER', 'MANAGER', 'ADMIN'), (0, validateRequest_1.default)(ai_validation_1.aiValidations.contentGenerationValidationSchema), ai_controller_1.aiController.generateItemContent);
 router.post('/discover', ai_controller_1.aiController.discoverProducts);
+// Allow recommendations to be fetched with a query userId for debugging (no auth required)
+router.get('/recommendations', (0, validateRequest_1.validateQuery)(ai_validation_1.aiValidations.recommendationValidationSchema), ai_controller_1.aiController.getRecommendations);
 // Other authenticated routes
 router.use((0, auth_1.default)()); // Apply auth middleware for all routes below
-router.get('/recommendations', (0, validateRequest_1.validateQuery)(ai_validation_1.aiValidations.recommendationValidationSchema), ai_controller_1.aiController.getRecommendations);
 router.post('/chat', (0, validateRequest_1.default)(ai_validation_1.aiValidations.chatValidationSchema), ai_controller_1.aiController.chatWithAI);
 // Analytics - ADMIN only
 router.get('/analytics', (0, auth_1.default)('ADMIN'), (0, validateRequest_1.validateQuery)(ai_validation_1.aiValidations.analyticsValidationSchema), ai_controller_1.aiController.generateAnalytics);
