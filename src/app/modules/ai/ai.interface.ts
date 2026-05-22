@@ -1,5 +1,5 @@
 export interface IContentGenerationRequest {
-  type: 'blog' | 'description' | 'title' | 'item-description' | 'item-title';
+  type?: 'blog' | 'description' | 'title' | 'item-description' | 'item-title' | 'tags' | 'item-tags' | 'all';
   topic?: string;
   keywords?: string[];
   length?: 'short' | 'medium' | 'long';

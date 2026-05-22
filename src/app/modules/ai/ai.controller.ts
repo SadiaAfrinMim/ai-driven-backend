@@ -145,8 +145,10 @@ const analyzeSentiment = catchAsync(async (req: Request, res: Response) => {
 });
 
 const generateReview = catchAsync(async (req: Request, res: Response) => {
+  console.log('📝 /ai/generate-review called with:', req.body);
   const { productName, rating } = req.body;
   const result = await aiService.generateReviewText(productName, rating);
+  console.log('✅ /ai/generate-review success, length:', result.comment?.length);
   sendResponse(res, 200, true, 'Review generated successfully', result);
 });
 

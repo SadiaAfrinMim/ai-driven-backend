@@ -10,19 +10,39 @@ import { config } from '../../../config/config';
 
 export class OpenAIProvider extends AIProvider {
   readonly name = 'OpenAI';
-  readonly model = 'gpt-4-turbo';
+  model: string = 'gpt-4o-mini';
   private client: OpenAI;
   private requestCount = 0;
   private tokenCount = 0;
 
   constructor() {
     super();
-    if (!config.openai.apiKey) {
+    const apiKey = config.openai.apiKey;
+    if (!apiKey) {
       throw new Error('OpenAI API key is not configured');
     }
+    const isOpenRouter = apiKey.startsWith('sk-or-');
+    const baseURL = process.env.OPENAI_BASE_URL || (isOpenRouter ? 'https://openrouter.ai/api/v1' : undefined);
+
     this.client = new OpenAI({
-      apiKey: config.openai.apiKey,
+      apiKey,
+      ...(baseURL && { baseURL }),
+      ...(isOpenRouter && {
+        defaultHeaders: {
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+          'X-Title': process.env.APP_NAME || 'AI Product Suggestion',
+        },
+      }),
     });
+
+    const envModel = process.env.AI_REVIEW_MODEL || process.env.AI_MODEL;
+    if (envModel) {
+      this.model = envModel;
+    } else if (isOpenRouter) {
+      this.model = 'openai/gpt-4o-mini';
+    } else {
+      this.model = 'gpt-4o-mini';
+    }
   }
 
   validateRequest(request: GenerateContentRequest): boolean {
@@ -46,7 +66,7 @@ export class OpenAIProvider extends AIProvider {
       const prompt = this.buildSystemPrompt(request);
 
       const response = await this.client.chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: this.model,
         messages: [
           {
             role: 'system',
@@ -101,7 +121,7 @@ export class OpenAIProvider extends AIProvider {
       const prompt = this.buildSystemPrompt(request);
 
       const stream = await this.client.chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: this.model,
         messages: [
           {
             role: 'system',
@@ -140,6 +160,7 @@ export class OpenAIProvider extends AIProvider {
       'product-title': `You are a product naming expert. Generate catchy, descriptive product titles that 
         are SEO-friendly and appeal to potential customers. Titles should be concise (5-10 words max) 
         and clearly convey the product's main benefit.`,
+      'product-tags': `You are an expert at generating relevant product tags. Given a product topic, category and features, output EXACTLY 5 short, SEO-friendly tags. Each tag must be 1-3 words max, use hyphens instead of spaces if needed, all lowercase. Return ONLY the 5 tags separated by commas. No other text, no numbering, no explanations, no quotes.`,
       'blog': `You are a professional blog writer. Write engaging, informative blog posts that are 
         well-structured with clear sections, bullet points where appropriate, and valuable insights. 
         Ensure content is original, accurate, and follows best practices for readability.`,

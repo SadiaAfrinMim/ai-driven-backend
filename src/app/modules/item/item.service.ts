@@ -5,6 +5,7 @@ import { IItem, ICreateItem, IUpdateItem, IItemFilters, IItemPagination, IItemRe
 import ApiError from '../../../errors/ApiError';
 import { aiService } from '../ai/ai.service';
 import { IContentGenerationRequest } from '../ai/ai.interface';
+import { enhancedAIService } from '../ai/EnhancedAIService';
 import { ItemStatus } from '@prisma/client';
 
 const createItem = async (userId: string, payload: ICreateItem, files?: { buffer: Buffer; mimetype: string }[]): Promise<IItem> => {
@@ -38,23 +39,44 @@ const createItem = async (userId: string, payload: ICreateItem, files?: { buffer
 
   // Images are optional — continue even if no images were uploaded
 
-  // If AI generation is requested, generate description and tags
+  // If AI generation is requested, generate description + real AI tags (5 tags via LLM)
   if (payload.isAIContent) {
     try {
-      const aiRequest: IContentGenerationRequest = {
+      // 1. Description (and possibly title)
+      const descRequest: IContentGenerationRequest = {
         type: 'item-description',
         topic: payload.title,
         keywords: payload.tags,
         category: payload.category,
+        price: payload.price,
       };
 
-      const aiResult = await aiService.generateItemContent(aiRequest);
+      const descResult = await aiService.generateItemContent(descRequest);
 
-      if (aiResult.title && !payload.title) payload.title = aiResult.title;
-      if (aiResult.description && !payload.description) payload.description = aiResult.description;
-      if (aiResult.tags && aiResult.tags.length > 0) payload.tags = [...new Set([...(payload.tags || []), ...aiResult.tags])];
+      if (descResult.title && !payload.title) payload.title = descResult.title;
+      if (descResult.description && !payload.description) payload.description = descResult.description;
 
-      console.log('✅ AI generated content applied to item:', { title: payload.title, tags: payload.tags });
+      // 2. Generate 5 high-quality AI tags using the dedicated LLM path
+      const tagRequest: IContentGenerationRequest = {
+        category: payload.category,
+        topic: payload.title || payload.category,
+        keywords: payload.tags || [],
+        price: payload.price,
+      };
+
+      // Use the real AI tag generator (not the old heuristic)
+      const aiTags = await enhancedAIService.generateProductTags(tagRequest);
+
+      if (aiTags && aiTags.length > 0) {
+        const existing = (payload.tags || []).map((t: string) => t.toLowerCase());
+        const newOnes = aiTags.filter((t: string) => !existing.includes(t.toLowerCase()));
+        payload.tags = [...(payload.tags || []), ...newOnes].slice(0, 5);
+      }
+
+      console.log('✅ AI generated content + tags applied to item:', { 
+        title: payload.title, 
+        tags: payload.tags 
+      });
     } catch (err) {
       console.error('❌ AI generation failed, continuing without AI content:', err);
     }
@@ -63,14 +85,14 @@ const createItem = async (userId: string, payload: ICreateItem, files?: { buffer
     const item = await prisma.item.create({
       data: {
         title: payload.title,
-        description: payload.description,
+        description: payload.description || 'High-quality product ready for use.',
         price: payload.price,
         location: payload.location,
         category: payload.category || 'uncategorized',
         tags: payload.tags || [],
         images: imageUrls,
         isAIContent: payload.isAIContent || false,
-        quantity: 1,
+        quantity: typeof payload.quantity === 'number' ? payload.quantity : 0,
         status: 'PENDING',
         ownerId: userId,
       },

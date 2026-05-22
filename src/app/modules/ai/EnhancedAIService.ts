@@ -164,6 +164,118 @@ export class EnhancedAIService {
     }
   }
 
+  async generateProductTags(request: IContentGenerationRequest): Promise<string[]> {
+    const cacheKey = cacheService.generateCacheKey('product-tags', {
+      topic: request.topic,
+      category: request.category,
+      keywords: request.keywords?.join(','),
+    });
+
+    try {
+      const cached = await cacheService.get<string[]>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
+      const prompt = this.buildProductTagsPrompt(request);
+
+      const aiProvider = AIProviderFactory.getProvider(this.provider);
+
+      const aiResponse = await aiProvider.generateContent({
+        prompt,
+        type: 'product-tags',
+        maxTokens: 80,
+      });
+
+      const raw = (aiResponse.content || '').trim();
+
+      // Parse comma/newline separated tags, clean to max 5
+      let tags: string[] = raw
+        .split(/[\n,;]+/)
+        .map((t: string) => t.trim().replace(/^#/, '').toLowerCase())
+        .filter((t: string) => t.length > 0 && t.length <= 25)
+        .slice(0, 5);
+
+      // Normalize to #hashtag-style (no spaces, title-case words joined)
+      tags = tags
+        .map((t: string) => {
+          const cleaned = t.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          if (!cleaned) return '';
+          // Convert to TitleCase parts
+          const parts = cleaned.split('-').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+          return '#' + parts.join('');
+        })
+        .filter((t: string) => t.length > 1);
+
+      // Deduplicate
+      tags = Array.from(new Set(tags.map(t => t.toLowerCase()))).map(t => t.charAt(0).toUpperCase() + t.slice(1)) as string[];
+
+      // Ensure we always return exactly 5 tags — prefer smart context-aware ones
+      if (tags.length < 5) {
+        const smart = this.generateSmartTagsFallback(request);
+        for (const s of smart) {
+          if (tags.length >= 5) break;
+          const lower = s.toLowerCase();
+          if (!tags.some((x: string) => x.toLowerCase() === lower)) {
+            tags.push(s);
+          }
+        }
+      }
+
+      // Last resort generic padding
+      if (tags.length < 5) {
+        const fallbacks = ['#Premium', '#Quality', '#BestChoice', '#Value', '#New'];
+        for (const f of fallbacks) {
+          if (tags.length >= 5) break;
+          const lower = f.toLowerCase();
+          if (!tags.some((x: string) => x.toLowerCase() === lower)) {
+            tags.push(f);
+          }
+        }
+      }
+
+      tags = tags.slice(0, 5);
+
+      await cacheService.set(
+        cacheKey,
+        tags,
+        { ttl: 3600, tags: ['product-tags', request.category || 'general'] }
+      );
+
+      return tags;
+    } catch (error) {
+      console.error('Product tags generation error (AI), using heuristic fallback:', error);
+      return this.generateSmartTagsFallback(request);
+    }
+  }
+
+  private generateSmartTagsFallback(request: IContentGenerationRequest): string[] {
+    const base: string[] = [];
+    if (request.category) base.push(request.category);
+    if (request.keywords && request.keywords.length > 0) base.push(...request.keywords);
+    if (request.topic) base.push(request.topic);
+
+    let tags: string[] = [];
+    if (base.length > 0) {
+      const cleaned = Array.from(new Set(base.map((t) => t.trim()).filter(Boolean)));
+      tags = cleaned.map((t) =>
+        '#' + t.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+      );
+    }
+
+    // Always guarantee exactly 5 tags
+    const fallbacks = ['#Premium', '#Quality', '#BestChoice', '#Value', '#Popular'];
+    for (const f of fallbacks) {
+      if (tags.length >= 5) break;
+      const lower = f.toLowerCase();
+      if (!tags.some((x: string) => x.toLowerCase() === lower)) {
+        tags.push(f);
+      }
+    }
+
+    return tags.slice(0, 5);
+  }
+
   async generateItemContent(request: IContentGenerationRequest): Promise<{
     title?: string;
     description?: string;
@@ -171,57 +283,35 @@ export class EnhancedAIService {
   }> {
     try {
       const result: any = {};
+      const t: string = request.type || '';
 
-      if (request.type === 'item-title' || !request.type) {
+      const wantsTitle = !t || t === 'item-title' || t === 'title' || t === 'all';
+      const wantsDesc = !t || t === 'item-description' || t === 'description' || t === 'all';
+      const wantsTags = !t || t === 'tags' || t === 'item-tags' || t === 'all';
+
+      if (wantsTitle) {
         result.title = await this.generateProductTitle(request);
       }
 
-      if (request.type === 'item-description' || !request.type) {
+      if (wantsDesc) {
         const descriptionResponse = await this.generateProductDescription(request);
         result.description = descriptionResponse.content;
       }
 
-      // Always generate good tags when type is tags or when category/keywords exist
-      const generateSmartTags = () => {
-        const base = [];
-        if (request.category) base.push(request.category);
-        if (request.keywords && request.keywords.length > 0) base.push(...request.keywords);
-        if (request.topic) base.push(request.topic);
-
-        if (base.length === 0) return ['#Premium', '#Quality', '#BestChoice'];
-
-        const cleaned = Array.from(new Set(base.map(t => t.trim()).filter(Boolean))).slice(0, 5);
-        return cleaned.map(t => '#' + t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(''));
-      };
-
-      result.tags = generateSmartTags();
-
-      // Ensure tags are meaningful words (normalize)
-      if (result.tags && Array.isArray(result.tags)) {
-        // Remove duplicates and ensure category is not repeated in tags
-        const normalized = result.tags.map((t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()).filter(Boolean);
-        const withoutCategory = normalized.filter((t: string) => !(request.category && t === request.category.toLowerCase()));
-        const unique = Array.from(new Set(withoutCategory)).slice(0,5);
-        // Format tags to user-friendly hashtag style: #TagName (TitleCase, no spaces)
-        const formatTag = (t: string) => {
-          return '#'+ t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-        };
-        result.tags = (unique as string[]).map((t) => formatTag(t));
+      if (wantsTags) {
+        // Real AI-generated 5 tags using the configured model (.env)
+        result.tags = await this.generateProductTags(request);
       }
 
       return result;
     } catch (error) {
       console.error('Item content generation error:', error);
-      // Fallback: build simple tags from category and keywords
-      const fallbackTags = [] as string[];
-      if (request.category) fallbackTags.push(request.category);
-      if (request.keywords && request.keywords.length > 0) fallbackTags.push(...request.keywords.slice(0, 5));
-      const fallbackResult: any = {
+      const fallbackTags = this.generateSmartTagsFallback(request);
+      return {
         title: request.topic ? `${request.topic} — Reliable Choice` : undefined,
         description: request.topic ? `A dependable ${request.topic} that meets your needs in ${request.category || 'the relevant category'}.` : undefined,
         tags: fallbackTags,
       };
-      return fallbackResult;
     }
   }
 
@@ -488,6 +578,33 @@ For now, you can browse our products, check reviews, or contact support for assi
     }
 
     prompt += '\nTitle should be 5-10 words, clear, and appealing to customers.';
+
+    return prompt;
+  }
+
+  private buildProductTagsPrompt(request: IContentGenerationRequest): string {
+    let prompt = 'Generate exactly 5 highly relevant, SEO-friendly product tags for the following product.';
+
+    if (request.topic) {
+      prompt += `\nProduct/Topic: ${request.topic}`;
+    }
+    if (request.category) {
+      prompt += `\nCategory: ${request.category}`;
+    }
+    if (request.price) {
+      prompt += `\nPrice: ${request.price}`;
+    }
+    if (request.keywords && request.keywords.length > 0) {
+      prompt += `\nKey features/keywords: ${request.keywords.join(', ')}`;
+    }
+
+    prompt += `
+Rules:
+- Exactly 5 tags.
+- Each tag: 1-3 words, short, catchy.
+- Use hyphen (-) instead of spaces (e.g. wireless-earbuds).
+- Lowercase letters only in the output tags.
+- Output ONLY the 5 tags separated by commas. No other text, no numbers, no bullets, no explanations.`;
 
     return prompt;
   }

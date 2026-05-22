@@ -1,19 +1,20 @@
 import prisma from '../../../config/database';
-import { enhancedAIService } from './EnhancedAIService';
+import OpenAI from 'openai';
+import ApiError from '../../../errors/ApiError';
 import {
   IContentGenerationRequest,
   IContentGenerationResponse,
-  IDiscoverProductsRequest,
-  IDiscoverProductsResponse,
   IRecommendationRequest,
   IRecommendationResponse,
+  IDiscoverProductsRequest,
+  IDiscoverProductsResponse,
   IChatRequest,
   IChatResponse,
   IAnalyticsRequest,
   IAnalyticsResponse,
   IBlogGeneration,
 } from './ai.interface';
-import ApiError from '../../../errors/ApiError';
+import { enhancedAIService } from './EnhancedAIService';
 
 // Export service functions that delegate to EnhancedAIService
 const aiService = {
@@ -62,7 +63,7 @@ const aiService = {
     const budget = typeof request.budget === 'number' && !Number.isNaN(request.budget)
       ? request.budget
       : undefined;
-    const tags = (request.tags || []).map(tag => tag.trim().toLowerCase()).filter(Boolean);
+    const tags = (request.tags || []).map((tag: string) => tag.trim().toLowerCase()).filter(Boolean);
     const limit = Math.min(Math.max(request.limit || 6, 1), 12);
 
     const items = await prisma.item.findMany({
@@ -101,7 +102,7 @@ const aiService = {
 
       if (normalizedQuery) {
         const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
-        const tokenMatches = queryTokens.filter(token => haystack.includes(token)).length;
+        const tokenMatches = queryTokens.filter((token: string) => haystack.includes(token)).length;
         if (tokenMatches > 0) {
           score += tokenMatches * 12;
           reasons.push('Matches what you asked for');
@@ -113,7 +114,7 @@ const aiService = {
         reasons.push('Fits your preferred vibe');
       }
 
-      const matchedTags = tags.filter(tag => haystack.includes(tag));
+      const matchedTags = tags.filter((tag: string) => haystack.includes(tag));
       if (matchedTags.length > 0) {
         score += matchedTags.length * 8;
         reasons.push(`Aligned with ${matchedTags.length} preference tags`);
@@ -309,10 +310,112 @@ const aiService = {
   },
 
   async generateReviewText(productName: string, rating: number) {
-    return {
-      comment: `This ${productName} is absolutely amazing! I gave it ${rating} stars because the quality exceeded my expectations. Highly recommended for anyone looking for a great product.`,
-      suggestedRating: rating,
-    };
+    try {
+      // Prefer Groq (more reliable free tier) if key is available and looks valid
+      const groqKey = process.env.GROQ_API_KEY;
+      const isValidGroqKey = groqKey && groqKey.startsWith('gsk_');
+
+      if (isValidGroqKey) {
+        try {
+          const groq = new OpenAI({
+            apiKey: groqKey,
+            baseURL: 'https://api.groq.com/openai/v1',
+          });
+
+          const prompt = `Write a natural, authentic product review for "${productName}" with a rating of ${rating} out of 5 stars. 
+The review should be in first person, sound like a real customer, and be between 2-4 sentences. 
+Vary the language, focus on different aspects like quality, value, experience, or features. 
+Do not repeat the same template every time. Make it feel personal and genuine.`;
+
+          const model = 'gemma2-9b-it'; // Safe & widely available model on Groq free tier
+
+          const completion = await groq.chat.completions.create({
+            model,
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful assistant that writes realistic product reviews."
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            temperature: 0.85,
+            max_tokens: 200,
+          });
+
+          const comment = completion.choices[0]?.message?.content?.trim() || 
+            `I really like the ${productName}. It deserves ${rating} stars for its quality.`;
+
+          return { comment, suggestedRating: rating };
+        } catch (groqError: any) {
+          console.error("Groq failed, falling back to OpenRouter:", groqError?.message || groqError);
+          // Will fall through to OpenRouter below
+        }
+      }
+
+      // Fallback to OpenRouter / OpenAI
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Neither GROQ_API_KEY nor OPENAI_API_KEY is set');
+      }
+
+      const baseURL = process.env.OPENAI_BASE_URL || (apiKey.startsWith('sk-or-') ? 'https://openrouter.ai/api/v1' : undefined);
+      const isOpenRouter = !!(baseURL && baseURL.includes('openrouter'));
+
+      const openai = new OpenAI({
+        apiKey,
+        ...(baseURL && { baseURL }),
+        ...(isOpenRouter && {
+          defaultHeaders: {
+            'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+            'X-Title': process.env.APP_NAME || 'AI Product Suggestion',
+          },
+        }),
+      });
+
+      const prompt = `Write a natural, authentic product review for "${productName}" with a rating of ${rating} out of 5 stars. 
+The review should be in first person, sound like a real customer, and be between 2-4 sentences. 
+Vary the language, focus on different aspects like quality, value, experience, or features. 
+Do not repeat the same template every time. Make it feel personal and genuine.`;
+
+      const model = process.env.AI_REVIEW_MODEL || (isOpenRouter ? 'openai/gpt-4o-mini' : 'gpt-4o-mini');
+
+      const completion = await openai.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that writes realistic product reviews."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.85,
+        max_tokens: 200,
+      });
+
+      const comment = completion.choices[0]?.message?.content?.trim() || 
+        `I really like the ${productName}. It deserves ${rating} stars for its quality.`;
+
+      return { comment, suggestedRating: rating };
+    } catch (err: unknown) {
+      const error = err as any;
+      console.error("AI review generation failed - full error:", error);
+
+      let realMessage = 'Failed to generate AI review. Please try again or write manually.';
+
+      if (error?.response?.data?.error?.message) {
+        realMessage = `AI Error: ${error.response.data.error.message}`;
+      } else if (error?.message) {
+        realMessage = `AI Error: ${error.message}`;
+      }
+
+      throw new ApiError(500, realMessage);
+    }
   },
 
   async analyzeSentiment(data: { text: string }) {

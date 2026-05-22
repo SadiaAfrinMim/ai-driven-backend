@@ -79,6 +79,9 @@ const createItem = catchAsync(async (req: Request, res: Response) => {
     title: parsedData.title?.trim(),
     description: parsedData.description?.trim(),
     price: parseFloat(parsedData.price),
+    quantity: parsedData.quantity !== undefined && parsedData.quantity !== '' 
+              ? Number(parsedData.quantity) 
+              : 0,
     location: parsedData.location?.trim(),
     category: parsedData.category?.trim(),
     tags: parsedData.tags ? (Array.isArray(parsedData.tags) ? parsedData.tags : parsedData.tags.split(',').map((t: string) => t.trim())) : [],

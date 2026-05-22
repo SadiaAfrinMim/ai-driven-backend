@@ -22,6 +22,7 @@ export interface ICreateItem {
   title: string;
   description: string;
   price: number;
+  quantity?: number;
   location: string;
   category: string;
   tags?: string[];
@@ -35,6 +36,7 @@ export interface IUpdateItem {
   title?: string;
   description?: string;
   price?: number;
+  quantity?: number;
   location?: string;
   category?: string;
   tags?: string[];
@@ -59,6 +61,7 @@ export interface IUpdateItem {
   title?: string;
   description?: string;
   price?: number;
+  quantity?: number;
   location?: string;
   category?: string;
   tags?: string[];

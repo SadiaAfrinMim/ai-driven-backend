@@ -31,6 +31,9 @@ router.get(
   aiController.getRecommendations
 );
 
+// Generate AI review text - public (no auth needed, just helper text)
+router.post('/generate-review', aiController.generateReview);
+
 // Other authenticated routes
 router.use(auth()); // Apply auth middleware for all routes below
 
@@ -62,8 +65,5 @@ router.get('/insights', auth('MANAGER', 'ADMIN'), aiController.getInsights);
 // Advanced trending features 2026
 router.post('/analyze-trends', auth('USER', 'MANAGER', 'ADMIN'), aiController.analyzeTrends);
 router.post('/analyze-sentiment', auth('USER', 'MANAGER', 'ADMIN'), aiController.analyzeSentiment);
-
-// Generate AI review text
-router.post('/generate-review', auth('USER', 'MANAGER', 'ADMIN'), aiController.generateReview);
 
 export default router;

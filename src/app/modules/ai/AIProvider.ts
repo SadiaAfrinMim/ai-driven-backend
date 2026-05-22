@@ -5,7 +5,7 @@
 
 export interface GenerateContentRequest {
   prompt: string;
-  type: 'product-description' | 'product-title' | 'blog' | 'chat';
+  type: 'product-description' | 'product-title' | 'product-tags' | 'blog' | 'chat';
   tone?: 'professional' | 'casual' | 'creative' | 'formal';
   length?: 'short' | 'medium' | 'long';
   maxTokens?: number;

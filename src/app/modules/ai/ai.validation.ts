@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const contentGenerationValidationSchema = z.object({
-  type: z.enum(['blog', 'description', 'title', 'item-description', 'item-title']).optional(),
+  type: z.enum(['blog', 'description', 'title', 'item-description', 'item-title', 'tags', 'item-tags', 'all']).optional(),
   topic: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   length: z.enum(['short', 'medium', 'long']).optional(),
