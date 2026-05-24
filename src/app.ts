@@ -18,11 +18,28 @@ cacheService.connect().catch(err => {
 app.use(helmet());
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://ai-project-flax-ten.vercel.app",
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-side)
+      if (!origin) return callback(null, true);
+
+      const allowed = [
+        /^http:\/\/localhost(:\d+)?$/,
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+        "https://ai-project-flax-ten.vercel.app",
+        // Add your production frontend domain here when ready
+      ];
+
+      const isAllowed = allowed.some((pattern) =>
+        typeof pattern === "string" ? pattern === origin : pattern.test(origin)
+      );
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn(`CORS blocked origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
