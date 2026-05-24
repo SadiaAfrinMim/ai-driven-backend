@@ -1,0 +1,15 @@
+মডিউল (Module),এন্ডপয়েন্ট (Endpoint),মেথড (Method),পারমিশন (Allowed Roles)
+Auth,"/register, /login",POST,Public (সবাই)
+User,/profile (Own),GET/PATCH,"USER, MANAGER, ADMIN"
+User,/all-users,GET,ADMIN
+User,/update-role,PATCH,ADMIN
+Item,/ (Listings),GET,Public (সবাই)
+Item,/:id (Details),GET,Public (সবাই)
+Item,/create-item,POST,"MANAGER, ADMIN"
+Item,/update-item/:id,PATCH,"MANAGER, ADMIN"
+Item,/delete-item/:id,DELETE,ADMIN
+Review,/create-review,POST,"USER, MANAGER, ADMIN"
+Review,/delete-review/:id,DELETE,"MANAGER, ADMIN"
+AI,/generate-content,POST,"USER, MANAGER, ADMIN"
+AI,/analytics,GET,ADMIN
+AI,/insights,GET,"MANAGER, ADMIN"

@@ -1,0 +1,235 @@
+server/
+├── prisma/
+│   ├── schemas/                 # Modular Prisma Files
+│   │   ├── user.prisma          
+│   │   ├── item.prisma          
+│   │   ├── review.prisma        
+│   │   └── blog.prisma          
+│   ├── schema.prisma            # Main Entry (previewFeatures=["prismaSchemaFolder"])
+│   └── seed.ts                  
+├── src/
+│   ├── server.ts                # Server listener
+│   ├── app.ts                   # Express config
+│   ├── app/
+│   │   ├── routes/              # index.ts (Combined routes)
+│   │   ├── middlewares/         # auth.ts, validateRequest.ts, globalError.ts
+│   │   └── modules/             # FEATURE-BASED MODULES
+│   │       ├── auth/            
+│   │       │   ├── auth.controller.ts
+│   │       │   ├── auth.service.ts
+│   │       │   ├── auth.routes.ts
+│   │       │   ├── auth.interface.ts   # (New) Login & Token Types
+│   │       │   └── auth.validation.ts  # Zod: Login/Register
+│   │       ├── user/            
+│   │       │   ├── user.controller.ts
+│   │       │   ├── user.service.ts
+│   │       │   ├── user.routes.ts
+│   │       │   ├── user.interface.ts   # TS: User Profile Types
+│   │       │   └── user.validation.ts  # Zod: Profile Update
+│   │       ├── item/            
+│   │       │   ├── item.controller.ts
+│   │       │   ├── item.service.ts
+│   │       │   ├── item.routes.ts
+│   │       │   ├── item.interface.ts   # TS: Item & Meta Types
+│   │       │   └── item.validation.ts  # Zod: Create/Update Item
+│   │       ├── review/          
+│   │       │   ├── review.controller.ts
+│   │       │   ├── review.service.ts
+│   │       │   ├── review.routes.ts
+│   │       │   ├── review.interface.ts # TS: Rating & Review Types
+│   │       │   └── review.validation.ts# Zod: Feedback Schema
+│   │       └── ai/              
+│   │           ├── ai.controller.ts
+│   │           ├── ai.service.ts
+│   │           ├── ai.routes.ts
+│   │           ├── ai.interface.ts     # TS: Prompt/Response Types
+│   │           └── ai.validation.ts    # Zod: AI Input check
+│   ├── config/                  
+│   ├── errors/                  # ApiError.ts
+│   ├── shared/                  # sendResponse.ts, pick.ts
+│   └── utils/                   # catchAsync.ts
+└── .env 
+
+
+
+
+enum UserRole {
+  USER
+  ADMIN
+  MANAGER
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          UserRole  @default(USER)
+  profileImage  String?
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  items         Item[]
+  reviews       Review[]
+  blogs         Blog[]
+  chatHistory   ChatHistory[]
+}
+
+
+model Item {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  price       Float
+  location    String
+  rating      Float    @default(0)
+  category    String
+  tags        String[] // AI Auto-tagging output
+  images      String[] // Multiple images support
+  isAIContent Boolean  @default(false) // AI দিয়ে জেনারেট করা কি না
+
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  reviews     Review[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
+model Review {
+  id        String   @id @default(uuid())
+  comment   String   @db.Text
+  rating    Int      @default(5)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+
+model Blog {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @db.Text
+  thumbnail String?
+  isAIGenerated Boolean @default(true)
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model ChatHistory {
+  id        String   @id @default(uuid())
+  message   String   @db.Text // User input
+  response  String   @db.Text // AI response
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+
+model AIInsight {
+  id        String   @id @default(uuid())
+  topic     String   // e.g., "Monthly Sales Analysis"
+  insight   String   @db.Text // AI generated summary
+  chartData Json?    // JSON format data for frontend charts
+
+  createdAt DateTime @default(now())
+}
+
+
+১. Auth Module (ভিত্তি - সবার আগে এটি করুন)
+এটি আপনার অ্যাপের গেটওয়ে। লগইন এবং রেজিস্ট্রেশন ছাড়া আপনি ড্যাশবোর্ড বা ডাইনামিক কোনো ফিচার টেস্ট করতে পারবেন না।
+
+কাজ: Registration, Login, Social Login (Google), Demo Login (auto-fill)।
+
+কেন দরকার: রিকোয়ারমেন্ট অনুযায়ী User, Admin, এবং Manager রোল হ্যান্ডেল করার জন্য।
+
+২. User Module
+লগইন করার পর ইউজারের ব্যক্তিগত তথ্যের জন্য এটি প্রয়োজন।
+
+কাজ: Profile Page (Editable), Role Management, User Overview।
+
+কেন দরকার: রিকোয়ারমেন্টে থাকা "Profile page with editable info" এবং "Dashboard sidebar" এর জন্য।
+
+৩. Item Module (কোর মডিউল)
+এটি আপনার অ্যাপের প্রধান অংশ যেখানে সব পণ্য বা সেবা লিস্ট করা থাকবে।
+
+কাজ: Create Item, Update, Delete, Search, Filter, Sort, Pagination।
+
+কেন দরকার: হোমপেজের "Core Listing", "Details Page", এবং "Explore Page" এর জন্য।
+
+৪. AI Module (স্মার্ট ফিচারস)
+আপনার প্রজেক্টের সবচেয়ে আকর্ষণীয় অংশ এটি।
+
+কাজ: AI Content Generator (Description লেখা), AI Auto Tagging (ট্যাগ জেনারেট করা), অথবা AI Chat Assistant।
+
+কেন দরকার: রিকোয়ারমেন্ট অনুযায়ী কমপক্ষে ২টি AI ফিচার ইমপ্লিমেন্ট করার জন্য।
+
+৫. Review/Feedback Module
+ইউজার এনগেজমেন্ট এবং ডেটা এনালাইসিস ফিচারের জন্য এটি জরুরি।
+
+কাজ: Rating দেওয়া, Comment করা, এবং রিভিউ লিস্ট দেখানো।
+
+কেন দরকার: Details পেজে রিভিউ দেখানো এবং "AI Data Analyzer" দিয়ে এই রিভিউগুলো এনালাইসিস করার জন্য।
+
+
+
+প্রজেক্টের পুরো স্ট্রাকচার এবং লজিক্যাল ফ্লো একনজরে দেখার জন্য একটি Complete Overview ফাইল নিচে দেওয়া হলো। এটি আপনি আপনার প্রজেক্টের রুট ডিরেক্টরিতে OVERVIEW.md বা STRUCTURE.md নামে সেভ করে রাখতে পারেন। এটি আপনাকে এবং আপনার কোড রিভিউয়ারকে প্রজেক্টের আর্কিটেকচার বুঝতে সাহায্য করবে।
+
+🚀 AI-Powered Full Stack Project Overview
+🏗️ Backend Architecture: Modular Pattern
+ব্যাকএন্ডটি Modular Pattern অনুসরণ করে তৈরি করা হয়েছে, যেখানে প্রতিটি ফিচার (Module) স্বাধীন এবং স্বয়ংসম্পূর্ণ।
+
+📁 Directory Structure
+Plaintext
+server/
+├── prisma/
+│   ├── schemas/              # Modular Database Tables
+│   │   ├── user.prisma       # Auth & Profile
+│   │   ├── item.prisma       # Listings & Core Data
+│   │   ├── review.prisma     # Ratings
+│   │   └── blog.prisma       # AI Content
+│   └── schema.prisma         # Main Config
+├── src/
+│   ├── app/
+│   │   ├── modules/          # Business Logic by Feature
+│   │   │   ├── [feature]/    # (auth, user, item, ai, review)
+│   │   │   │   ├── [].controller.ts  # Request/Response Handler
+│   │   │   │   ├── [].service.ts     # DB Queries (Prisma) & AI Logic
+│   │   │   │   ├── [].routes.ts      # Endpoint Definitions
+│   │   │   │   ├── [].interface.ts   # TS Type Definitions
+│   │   │   │   └── [].validation.ts  # Zod Schema Validation
+│   │   ├── routes/           # Central Router (AppRouter)
+│   │   └── middlewares/      # AuthGuard, Validations, GlobalErrorHandler
+│   ├── shared/               # Reusable Utilities (sendResponse, catchAsync)
+│   └── server.ts             # Entry Point
+🛠️ Tech Stack & Implementation Details
+
+
+2. Backend (Node.js & Express)
+PostgreSQL & Prisma: রিলেশনাল ডেটাবেস এবং টাইপ-সেফ কুয়েরি।
+
+Modular Routing: প্রতিটি মডিউলের নিজস্ব রাউট যা index.ts-এ কম্বাইন করা হয়।
+
+Zod Validation: রিকোয়েস্ট বডি বা কুয়েরি প্যারামিটার চেক করার জন্য।
+
+JWT Authentication: কুকি-বেজড সিকিউর লগইন সিস্টেম।
+
+3. AI Integration (At least 2 Features)
+AI Content Generator: ইউজার ইনপুটের ভিত্তিতে ডেসক্রিপশন বা ব্লগ তৈরি (Gemini/OpenAI SDK)।
+
+AI Smart Suggestions: ইউজারের ডেটা এনালাইসিস করে আইটেম রিকমেন্ড করা।
