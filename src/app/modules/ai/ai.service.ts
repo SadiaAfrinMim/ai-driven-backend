@@ -190,16 +190,9 @@ const aiService = {
   },
 
   async generateReviewText(productName: string, rating: number) {
-    try {
-      const comment = await enhancedAIService.generateReviewComment(productName, rating);
-      return { comment, suggestedRating: rating };
-    } catch (e) {
-      // Ultimate fallback (should rarely hit)
-      return {
-        comment: `The ${productName || 'product'} is ${rating >= 4 ? 'really good' : rating >= 3 ? 'okay' : 'disappointing'}. ${rating >= 4 ? 'Would recommend.' : ''}`.trim(),
-        suggestedRating: rating,
-      };
-    }
+    // Pure AI only — no default comments ever
+    const comment = await enhancedAIService.generateReviewComment(productName, rating);
+    return { comment, suggestedRating: rating };
   },
 
   async analyzeSentiment(data: { text: string }) {

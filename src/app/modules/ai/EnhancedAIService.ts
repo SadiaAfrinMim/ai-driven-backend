@@ -372,36 +372,9 @@ export class EnhancedAIService {
 
       return comment;
     } catch (error) {
-      console.error('AI review generation failed, using smart fallback:', error);
-
-      // High-quality contextual fallback (much better than the old static one)
-      const name = productName || 'this product';
-      const positive = [
-        `Really happy with my ${name}. Solid build, works exactly as described, and great value.`,
-        `The ${name} exceeded expectations — well made, thoughtful details, and arrived quickly.`,
-        `Excellent purchase. The ${name} feels premium and performs reliably every day.`,
-      ];
-      const neutral = [
-        `The ${name} is decent for the price. Does the job but nothing extraordinary.`,
-        `It's okay. The ${name} works fine, though I expected a bit more based on the description.`,
-      ];
-      const critical = [
-        `Unfortunately the ${name} didn't meet expectations. Quality feels below average for the price.`,
-        `Had issues with the ${name} right away. Customer support was slow to respond.`,
-      ];
-
-      let fallback = '';
-      if (rating >= 5) fallback = positive[0];
-      else if (rating === 4) fallback = positive[1];
-      else if (rating === 3) fallback = neutral[0];
-      else if (rating === 2) fallback = neutral[1];
-      else fallback = critical[0];
-
-      try {
-        await cacheService.set(cacheKey, fallback, { ttl: 300, tags: ['reviews', 'fallback'] });
-      } catch {}
-
-      return fallback;
+      console.error('AI review generation failed (no default comment):', error);
+      // No default/fallback comments — only real AI generated content allowed
+      throw new Error('AI review generation failed. Please try again or write manually.');
     }
   }
 
