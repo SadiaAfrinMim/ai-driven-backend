@@ -9,8 +9,8 @@ import ApiError from '../../../errors/ApiError';
 import { config } from '../../../config/config';
 
 export class OpenAIProvider extends AIProvider {
-  readonly name = 'OpenAI';
-  readonly model = 'gpt-4-turbo';
+  readonly name: string;
+  readonly model: string;
   private client: OpenAI;
   private requestCount = 0;
   private tokenCount = 0;
@@ -20,9 +20,22 @@ export class OpenAIProvider extends AIProvider {
     if (!config.openai.apiKey) {
       throw new Error('OpenAI API key is not configured');
     }
+
+    const apiKey = config.openai.apiKey;
+    const isOpenRouter = apiKey.startsWith('sk-or-');
+
     this.client = new OpenAI({
-      apiKey: config.openai.apiKey,
+      apiKey,
+      baseURL: isOpenRouter ? 'https://openrouter.ai/api/v1' : undefined,
     });
+
+    if (isOpenRouter) {
+      this.name = 'OpenRouter';
+      this.model = 'openai/gpt-4o-mini'; // matches user's AI_REVIEW_MODEL preference
+    } else {
+      this.name = 'OpenAI';
+      this.model = 'gpt-4-turbo';
+    }
   }
 
   validateRequest(request: GenerateContentRequest): boolean {
@@ -45,8 +58,11 @@ export class OpenAIProvider extends AIProvider {
       const maxTokens = this.getMaxTokens(request.length, request.maxTokens || 2000);
       const prompt = this.buildSystemPrompt(request);
 
+      // Use the effective model (OpenRouter or real OpenAI)
+      const modelToUse = this.model;
+
       const response = await this.client.chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: modelToUse,
         messages: [
           {
             role: 'system',
@@ -101,7 +117,7 @@ export class OpenAIProvider extends AIProvider {
       const prompt = this.buildSystemPrompt(request);
 
       const stream = await this.client.chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: this.model,
         messages: [
           {
             role: 'system',

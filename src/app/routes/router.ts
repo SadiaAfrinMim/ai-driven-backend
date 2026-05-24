@@ -5,6 +5,7 @@ import itemRoutes from '../modules/item/item.routes';
 import aiRoutes from '../modules/ai/ai.routes';
 import reviewRoutes from '../modules/review/review.routes';
 import notificationRoutes from '../modules/notification/notification.routes';
+import selectionRoutes from '../modules/selection/selection.routes';
 
 const router = express.Router();
 
@@ -34,5 +35,6 @@ router.use('/items', itemRoutes);
 router.use('/ai', aiRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/selections', selectionRoutes);
 
 export { router as BaseRouter };

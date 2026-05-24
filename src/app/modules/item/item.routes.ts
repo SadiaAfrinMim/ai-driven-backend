@@ -12,10 +12,10 @@ router.get('/approved', itemController.getApprovedItems);
 // Authenticated routes (authentication required)
 router.use(auth()); // All routes below require authentication
 
-// Create item - MANAGER, ADMIN only
+// Create item - USER, MANAGER, ADMIN (all go to PENDING for approval if needed)
 router.post(
   '/',
-  auth('MANAGER', 'ADMIN'),
+  auth('USER', 'MANAGER', 'ADMIN'),
   uploadItemImages,
   itemController.createItem
 );
@@ -32,7 +32,7 @@ router.patch('/:id/reject', auth('ADMIN'), itemController.rejectItem);
 router.get('/:id', itemController.getItemById);
 router.patch(
   '/:id',
-  auth('MANAGER', 'ADMIN'),
+  auth('USER', 'MANAGER', 'ADMIN'),
   itemController.updateItem
 );
 router.delete('/:id', auth('ADMIN'), itemController.deleteItem);

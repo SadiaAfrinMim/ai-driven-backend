@@ -1,0 +1,20 @@
+enum SelectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Selection {
+  id        String           @id @default(uuid())
+  quantity  Int              @default(1)
+  status    SelectionStatus  @default(PENDING)
+
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+
+  itemId    String
+  item      Item             @relation(fields: [itemId], references: [id])
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}

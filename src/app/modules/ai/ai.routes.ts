@@ -22,6 +22,9 @@ router.post(
   aiController.generateItemContent
 );
 
+// Public: AI review text generation (used in public product review form)
+router.post('/generate-review', aiController.generateReview);
+
 // Other authenticated routes
 router.use(auth()); // Apply auth middleware for all routes below
 
@@ -60,7 +63,7 @@ router.get('/insights', auth('MANAGER', 'ADMIN'), aiController.getInsights);
 router.post('/analyze-trends', auth('USER', 'MANAGER', 'ADMIN'), aiController.analyzeTrends);
 router.post('/analyze-sentiment', auth('USER', 'MANAGER', 'ADMIN'), aiController.analyzeSentiment);
 
-// Generate AI review text
-router.post('/generate-review', auth('USER', 'MANAGER', 'ADMIN'), aiController.generateReview);
+// NEW: AI Natural Language Command (powerful "just tell me what to do" feature)
+router.post('/command', auth('USER', 'MANAGER', 'ADMIN'), aiController.processCommand);
 
 export default router;

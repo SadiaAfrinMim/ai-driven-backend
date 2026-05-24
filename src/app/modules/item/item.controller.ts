@@ -79,6 +79,7 @@ const createItem = catchAsync(async (req: Request, res: Response) => {
     title: parsedData.title?.trim(),
     description: parsedData.description?.trim(),
     price: parseFloat(parsedData.price),
+    quantity: parsedData.quantity !== undefined ? Number(parsedData.quantity) : 0,
     location: parsedData.location?.trim(),
     category: parsedData.category?.trim(),
     tags: parsedData.tags ? (Array.isArray(parsedData.tags) ? parsedData.tags : parsedData.tags.split(',').map((t: string) => t.trim())) : [],
@@ -225,7 +226,7 @@ const approveItem = catchAsync(async (req: Request, res: Response) => {
 // Admin: Reject item
 const rejectItem = catchAsync(async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const result = await itemService.updateItemStatus(id, 'REJECT');
+  const result = await itemService.updateItemStatus(id, 'REJECTED');
   sendResponse(res, 200, true, 'Item rejected', result);
 });
 

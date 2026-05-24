@@ -69,7 +69,7 @@ const createItem = async (userId: string, payload: ICreateItem, files?: { buffer
         tags: payload.tags || [],
         images: imageUrls,
         isAIContent: payload.isAIContent || false,
-        quantity: 1,
+        quantity: payload.quantity ?? 0,
         status: 'PENDING',
         ownerId: userId,
       },
@@ -163,7 +163,7 @@ const getItems = async (
     // Build WHERE clause safely for fallback raw query
     let whereClause = '';
     if (where && where.status) {
-      const allowedStatuses = ['PENDING', 'APPROVED', 'REJECT'];
+      const allowedStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
       if (allowedStatuses.includes(where.status)) {
         whereClause = `WHERE "status" = '${where.status}'`;
       }

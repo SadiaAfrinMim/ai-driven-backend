@@ -1,5 +1,5 @@
 export interface IContentGenerationRequest {
-  type: 'blog' | 'description' | 'title' | 'item-description' | 'item-title';
+  type: 'blog' | 'description' | 'title' | 'item-description' | 'item-title' | 'tags';
   topic?: string;
   keywords?: string[];
   length?: 'short' | 'medium' | 'long';
@@ -21,7 +21,7 @@ export interface IContentGenerationResponse {
 
 export interface IRecommendationRequest {
   userId: string;
-  context?: 'browse' | 'search' | 'profile' | 'similar';
+  context?: 'browse' | 'search' | 'profile' | 'similar' | 'dashboard' | 'public';
   searchQuery?: string;
   category?: string;
   limit?: number;
@@ -100,4 +100,22 @@ export interface IAIInsight {
   insight: string;
   chartData?: any;
   createdAt: Date;
+}
+
+// ===== NEW: Natural Language AI Command Feature =====
+export interface ICommandRequest {
+  command: string;           // The raw natural language command from user
+  context?: string;          // Optional extra context (current page, product name, etc.)
+}
+
+export interface ICommandResponse {
+  success: boolean;
+  action: string;            // 'generate-description' | 'recommend' | 'write-review' | 'chat' | etc.
+  result: any;               // The actual generated content / data
+  message: string;           // Human friendly summary
+  metadata?: {
+    parsedIntent?: any;
+    model?: string;
+    executedAt: Date;
+  };
 }

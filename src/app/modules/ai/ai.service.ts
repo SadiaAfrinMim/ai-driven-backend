@@ -47,7 +47,7 @@ const aiService = {
       recommendations,
       metadata: {
         total: recommendations.length,
-        algorithm: 'collaborative-filtering-ai',
+        algorithm: 'ai-personalized-recommendations',
         generatedAt: new Date(),
       },
     };
@@ -190,10 +190,16 @@ const aiService = {
   },
 
   async generateReviewText(productName: string, rating: number) {
-    return {
-      comment: `This ${productName} is absolutely amazing! I gave it ${rating} stars because the quality exceeded my expectations. Highly recommended for anyone looking for a great product.`,
-      suggestedRating: rating,
-    };
+    try {
+      const comment = await enhancedAIService.generateReviewComment(productName, rating);
+      return { comment, suggestedRating: rating };
+    } catch (e) {
+      // Ultimate fallback (should rarely hit)
+      return {
+        comment: `The ${productName || 'product'} is ${rating >= 4 ? 'really good' : rating >= 3 ? 'okay' : 'disappointing'}. ${rating >= 4 ? 'Would recommend.' : ''}`.trim(),
+        suggestedRating: rating,
+      };
+    }
   },
 
   async analyzeSentiment(data: { text: string }) {
@@ -208,6 +214,104 @@ const aiService = {
       emotions: ['joy', 'trust', 'anticipation'].slice(0, Math.floor(Math.random() * 3) + 1),
       summary: `Advanced LLM analysis: The text expresses primarily ${sentiment} sentiment with emerging market excitement.`,
     };
+  },
+
+  // ====================== NEW POWERFUL FEATURE ======================
+  // AI Command - User types natural language → AI figures out what to do and executes
+  async processCommand(command: string, userId: string, context?: string) {
+    const lowerCmd = command.toLowerCase().trim();
+
+    // === INTENT DETECTION (fast keyword + smart routing) ===
+    const wantsReview = /review|রিভিউ|write review|generate review|দাও review/i.test(command);
+    const wantsDescription = /description|বর্ণনা|desc|generate description|improve description/i.test(command);
+    const wantsTitle = /title|টাইটেল|generate title|better title/i.test(command);
+    const wantsTags = /tag|tags|ট্যাগ|generate tag/i.test(command);
+    const wantsRecommendation = /recommend|suggest|প্রস্তাব|recommendation|similar product/i.test(command);
+    const wantsBlog = /blog|ব্লগ|article|write about/i.test(command);
+
+    try {
+      // 1. Review generation command
+      if (wantsReview) {
+        // Try to extract product name and rating from the command
+        const ratingMatch = command.match(/(\d)\s*(star|stars|রেটিং|রেট)/i);
+        const rating = ratingMatch ? Math.min(5, Math.max(1, parseInt(ratingMatch[1]))) : 5;
+
+        // Extract product name heuristically (after "for", "about", "of")
+        let productName = 'this product';
+        const forMatch = command.match(/(?:for|about|of)\s+([a-zA-Z0-9\s\-']{3,40})/i);
+        if (forMatch) productName = forMatch[1].trim();
+
+        const reviewResult = await enhancedAIService.generateReviewComment(productName, rating);
+
+        return {
+          success: true,
+          action: 'generate-review',
+          result: { comment: reviewResult, rating, productName },
+          message: `AI generated a ${rating}-star review for "${productName}"`,
+          metadata: { executedAt: new Date() }
+        };
+      }
+
+      // 2. Description / Title / Tags generation
+      if (wantsDescription || wantsTitle || wantsTags) {
+        const topicMatch = command.match(/(?:for|about|of)\s+([a-zA-Z0-9\s\-']{3,50})/i);
+        const topic = topicMatch ? topicMatch[1].trim() : (context || 'the product');
+
+        const contentReq: IContentGenerationRequest = {
+          type: wantsTitle ? 'title' : wantsTags ? 'tags' : 'description',
+          topic,
+          category: context,
+        };
+
+        if (wantsTitle) {
+          const title = await enhancedAIService.generateProductTitle(contentReq);
+          return { success: true, action: 'generate-title', result: { title }, message: `Generated title: ${title}` , metadata: { executedAt: new Date() } };
+        }
+        if (wantsTags) {
+          const tags = await enhancedAIService.generateProductTags(contentReq);
+          return { success: true, action: 'generate-tags', result: { tags }, message: 'AI suggested relevant tags', metadata: { executedAt: new Date() } };
+        }
+
+        // Default: description
+        const desc = await enhancedAIService.generateProductDescription(contentReq);
+        return { success: true, action: 'generate-description', result: desc, message: 'AI generated product description', metadata: { executedAt: new Date() } };
+      }
+
+      // 3. Recommendations
+      if (wantsRecommendation) {
+        const recs = await this.getRecommendations({ userId, limit: 6, context: 'dashboard' });
+        return { success: true, action: 'recommend', result: recs, message: 'Here are smart AI recommendations for you' , metadata: { executedAt: new Date() } };
+      }
+
+      // 4. Blog
+      if (wantsBlog) {
+        const topic = command.replace(/write|generate|create|blog|article|about/gi, '').trim() || 'trending products';
+        const blog = await this.generateBlog({ topic, length: 'medium' } as any, userId);
+        return { success: true, action: 'generate-blog', result: blog, message: 'AI blog post generated', metadata: { executedAt: new Date() } };
+      }
+
+      // === DEFAULT: Use full chat intelligence for anything else ===
+      const chatResponse = await enhancedAIService.processChat({ message: command, context });
+      
+      return {
+        success: true,
+        action: 'chat',
+        result: { response: chatResponse },
+        message: 'AI responded to your command',
+        metadata: { executedAt: new Date() }
+      };
+
+    } catch (error) {
+      console.error('AI Command processing error:', error);
+      // Ultimate safe fallback
+      return {
+        success: false,
+        action: 'chat',
+        result: { response: "I'm here to help! Try commands like: 'write a 5 star review for wireless earbuds', 'generate description for my laptop', or 'recommend products for me'." },
+        message: 'AI command processed (fallback)',
+        metadata: { executedAt: new Date() }
+      };
+    }
   },
 };
 

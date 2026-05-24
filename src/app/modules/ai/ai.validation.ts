@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const contentGenerationValidationSchema = z.object({
-  type: z.enum(['blog', 'description', 'title', 'item-description', 'item-title']).optional(),
+  type: z.enum(['blog', 'description', 'title', 'item-description', 'item-title', 'tags']).optional(),
   topic: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   length: z.enum(['short', 'medium', 'long']).optional(),
@@ -13,7 +13,7 @@ const contentGenerationValidationSchema = z.object({
 
 const recommendationValidationSchema = z.object({
   userId: z.string().optional(),
-  context: z.enum(['browse', 'search', 'profile', 'similar', 'dashboard']).optional(),
+  context: z.enum(['browse', 'search', 'profile', 'similar', 'dashboard', 'public']).optional(),
   searchQuery: z.string().optional(),
   category: z.string().optional(),
   limit: z.string().optional().transform(val => val ? parseInt(val) : 10),

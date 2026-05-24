@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -32,13 +32,14 @@ model User {
   blogs         Blog[]
   chatHistory   ChatHistory[]
   notifications Notification[]
+  selections    Selection[]
 }
 
 // ==================== ITEM ====================
 enum ItemStatus {
   PENDING
   APPROVED
-  REJECT
+  REJECTED
 }
 
 model Item {
@@ -59,6 +60,7 @@ model Item {
   ownerId     String
   owner       User        @relation(fields: [ownerId], references: [id])
   reviews     Review[]
+  selections  Selection[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -136,4 +138,26 @@ enum NotificationType {
   SUCCESS
   WARNING
   ERROR
+}
+
+// ==================== SELECTION (Buyer selects product, goes to Manager for approval) ====================
+enum SelectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Selection {
+  id        String           @id @default(uuid())
+  quantity  Int              @default(1)
+  status    SelectionStatus  @default(PENDING)
+
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+
+  itemId    String
+  item      Item             @relation(fields: [itemId], references: [id])
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }

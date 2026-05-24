@@ -136,6 +136,22 @@ const generateReview = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, 200, true, 'Review generated successfully', result);
 });
 
+// NEW: Powerful AI Natural Language Command endpoint
+const processCommand = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id;
+  const { command, context } = req.body;
+
+  if (!command || typeof command !== 'string') {
+    return sendResponse(res, 400, false, 'Command is required');
+  }
+
+  console.log('🤖 AI Command received from user:', userId, command.substring(0, 80));
+
+  const result = await aiService.processCommand(command, userId, context);
+
+  sendResponse(res, 200, true, result.message || 'AI command processed successfully', result);
+});
+
 export const aiController = {
   generateContent,
   generateItemContent,
@@ -148,4 +164,5 @@ export const aiController = {
   analyzeTrends,
   analyzeSentiment,
   generateReview,
+  processCommand,
 };

@@ -1,7 +1,7 @@
 enum ItemStatus {
   PENDING
   APPROVED
-  REJECT
+  REJECTED
 }
 
 model Item {
@@ -22,6 +22,7 @@ model Item {
   ownerId     String
   owner       User        @relation(fields: [ownerId], references: [id])
   reviews     Review[]
+  selections  Selection[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

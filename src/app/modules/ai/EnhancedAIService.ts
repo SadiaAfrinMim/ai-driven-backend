@@ -164,6 +164,125 @@ export class EnhancedAIService {
     }
   }
 
+  async generateProductTags(request: IContentGenerationRequest): Promise<string[]> {
+    const cacheKey = cacheService.generateCacheKey('product-tags', {
+      topic: request.topic,
+      category: request.category,
+      keywords: request.keywords,
+    });
+
+    try {
+      const cached = await cacheService.get<string[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        return cached;
+      }
+
+      const prompt = this.buildProductTagsPrompt(request);
+
+      const aiProvider = AIProviderFactory.getProvider(this.provider);
+
+      const aiResponse = await aiProvider.generateContent({
+        prompt,
+        type: 'tags',
+        tone: 'professional',
+        maxTokens: 120,
+      });
+
+      // Parse tags from AI response
+      let tags: string[] = [];
+      const raw = aiResponse.content || '';
+
+      // Split on commas, newlines, bullets, etc.
+      const parts = raw
+        .split(/[\n,•·\-\s]+/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const formatTag = (t: string) => {
+        // Remove leading # if present, clean, then re-apply clean #TitleCaseNoSpaces
+        let clean = t.replace(/^#/, '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+        if (!clean) return '';
+        const words = clean.split(/\s+/).filter(Boolean).slice(0, 3); // max 3 words per tag
+        return '#' + words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+      };
+
+      for (const p of parts) {
+        const ft = formatTag(p);
+        if (ft && ft.length > 1 && !tags.includes(ft)) {
+          tags.push(ft);
+        }
+        if (tags.length >= 5) break;
+      }
+
+      // If LLM gave fewer than 5, supplement with smart local ones
+      if (tags.length < 5) {
+        const extra = this.generateSmartLocalTags(request, 5 - tags.length);
+        for (const e of extra) {
+          if (!tags.includes(e)) tags.push(e);
+          if (tags.length >= 5) break;
+        }
+      }
+
+      // Final guarantee: always at least 3-5 good tags
+      if (tags.length === 0) {
+        tags = this.generateSmartLocalTags(request, 5);
+      }
+
+      // Cache for 1 hour
+      await cacheService.set(cacheKey, tags.slice(0, 5), {
+        ttl: 3600,
+        tags: ['product-tags', request.category || 'general']
+      });
+
+      return tags.slice(0, 5);
+    } catch (error) {
+      console.error('Product tags generation error (using smart fallback):', error);
+      const fallback = this.generateSmartLocalTags(request, 5);
+      try {
+        const fbKey = cacheService.generateCacheKey('product-tags', { topic: request.topic, category: request.category });
+        await cacheService.set(fbKey, fallback, { ttl: 60, tags: ['product-tags', 'fallback'] });
+      } catch {}
+      return fallback;
+    }
+  }
+
+  private generateSmartLocalTags(request: IContentGenerationRequest, count: number = 5): string[] {
+    const base: string[] = [];
+    if (request.category) base.push(request.category);
+    if (request.topic) base.push(request.topic);
+    if (request.keywords && request.keywords.length) base.push(...request.keywords);
+
+    const cleaned = Array.from(new Set(base.map(t => t.trim().toLowerCase()).filter(Boolean)));
+
+    const tags = new Set<string>();
+
+    // Add direct ones
+    cleaned.forEach(c => {
+      const formatted = '#' + c.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+      tags.add(formatted);
+    });
+
+    // Smart expansions / adjectives (category-aware if possible)
+    const cat = (request.category || '').toLowerCase();
+    const expansions: string[] = [];
+    if (cat.includes('electronics') || cat.includes('gadget')) expansions.push('Wireless', 'Smart', 'Portable', 'Durable', 'Premium');
+    else if (cat.includes('fashion') || cat.includes('clothing')) expansions.push('Stylish', 'Trendy', 'Comfortable', 'Breathable', 'Classic');
+    else if (cat.includes('home') || cat.includes('furniture')) expansions.push('Modern', 'Elegant', 'Compact', 'Handcrafted', 'Luxury');
+    else if (cat.includes('beauty') || cat.includes('skincare')) expansions.push('Natural', 'Organic', 'Gentle', 'Hydrating', 'Glow');
+    else expansions.push('Premium', 'Quality', 'Reliable', 'BestSeller', 'Value');
+
+    expansions.slice(0, count).forEach(exp => tags.add('#' + exp));
+
+    // Ensure exactly the requested count (or up to 5)
+    const result = Array.from(tags).slice(0, Math.max(3, Math.min(5, count + 2)));
+    // Pad with more if still short
+    while (result.length < count) {
+      const pad = ['#New', '#Hot', '#Essential', '#TopPick', '#MustHave'][result.length % 5];
+      if (!result.includes(pad)) result.push(pad);
+    }
+    return result.slice(0, 5);
+  }
+
   async generateItemContent(request: IContentGenerationRequest): Promise<{
     title?: string;
     description?: string;
@@ -181,32 +300,29 @@ export class EnhancedAIService {
         result.description = descriptionResponse.content;
       }
 
-      // Always generate good tags when type is tags or when category/keywords exist
-      const generateSmartTags = () => {
-        const base = [];
-        if (request.category) base.push(request.category);
-        if (request.keywords && request.keywords.length > 0) base.push(...request.keywords);
-        if (request.topic) base.push(request.topic);
+      // === Real AI-powered tags (always aim for 5 high-quality tags) ===
+      // Use LLM when specifically asked for tags, or when doing full content generation.
+      // This replaces the old weak local-only generator.
+      const shouldGenerateTags =
+        request.type === 'tags' ||
+        !request.type ||
+        request.type === 'item-title' ||
+        request.type === 'item-description';
 
-        if (base.length === 0) return ['#Premium', '#Quality', '#BestChoice'];
+      if (shouldGenerateTags) {
+        try {
+          const aiTags = await this.generateProductTags(request);
+          if (aiTags && aiTags.length > 0) {
+            result.tags = aiTags.slice(0, 5);
+          }
+        } catch {
+          // Will be handled by fallback inside generateProductTags
+        }
+      }
 
-        const cleaned = Array.from(new Set(base.map(t => t.trim()).filter(Boolean))).slice(0, 5);
-        return cleaned.map(t => '#' + t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(''));
-      };
-
-      result.tags = generateSmartTags();
-
-      // Ensure tags are meaningful words (normalize)
-      if (result.tags && Array.isArray(result.tags)) {
-        // Remove duplicates and ensure category is not repeated in tags
-        const normalized = result.tags.map((t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()).filter(Boolean);
-        const withoutCategory = normalized.filter((t: string) => !(request.category && t === request.category.toLowerCase()));
-        const unique = Array.from(new Set(withoutCategory)).slice(0,5);
-        // Format tags to user-friendly hashtag style: #TagName (TitleCase, no spaces)
-        const formatTag = (t: string) => {
-          return '#'+ t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
-        };
-        result.tags = (unique as string[]).map((t) => formatTag(t));
+      // Final safety: if still no tags (very rare), use strong local expander
+      if (!result.tags || result.tags.length === 0) {
+        result.tags = this.generateSmartLocalTags(request, 5);
       }
 
       return result;
@@ -222,6 +338,70 @@ export class EnhancedAIService {
         tags: fallbackTags,
       };
       return fallbackResult;
+    }
+  }
+
+  async generateReviewComment(productName: string, rating: number): Promise<string> {
+    const cacheKey = cacheService.generateCacheKey('review-comment', {
+      product: productName,
+      rating,
+    });
+
+    try {
+      const cached = await cacheService.get<string>(cacheKey);
+      if (cached) return cached;
+
+      const prompt = this.buildReviewCommentPrompt(productName, rating);
+
+      const aiProvider = AIProviderFactory.getProvider(this.provider);
+
+      const aiResponse = await aiProvider.generateContent({
+        prompt,
+        type: 'review',
+        tone: rating >= 4 ? 'casual' : rating >= 3 ? 'casual' : 'formal',
+        maxTokens: 180,
+      });
+
+      let comment = aiResponse.content.trim();
+
+      // Light cleanup
+      comment = comment.replace(/^["']|["']$/g, '').trim();
+      if (comment.length < 20) throw new Error('AI returned too short review');
+
+      await cacheService.set(cacheKey, comment, { ttl: 3600, tags: ['reviews', 'ai-generated'] });
+
+      return comment;
+    } catch (error) {
+      console.error('AI review generation failed, using smart fallback:', error);
+
+      // High-quality contextual fallback (much better than the old static one)
+      const name = productName || 'this product';
+      const positive = [
+        `Really happy with my ${name}. Solid build, works exactly as described, and great value.`,
+        `The ${name} exceeded expectations — well made, thoughtful details, and arrived quickly.`,
+        `Excellent purchase. The ${name} feels premium and performs reliably every day.`,
+      ];
+      const neutral = [
+        `The ${name} is decent for the price. Does the job but nothing extraordinary.`,
+        `It's okay. The ${name} works fine, though I expected a bit more based on the description.`,
+      ];
+      const critical = [
+        `Unfortunately the ${name} didn't meet expectations. Quality feels below average for the price.`,
+        `Had issues with the ${name} right away. Customer support was slow to respond.`,
+      ];
+
+      let fallback = '';
+      if (rating >= 5) fallback = positive[0];
+      else if (rating === 4) fallback = positive[1];
+      else if (rating === 3) fallback = neutral[0];
+      else if (rating === 2) fallback = neutral[1];
+      else fallback = critical[0];
+
+      try {
+        await cacheService.set(cacheKey, fallback, { ttl: 300, tags: ['reviews', 'fallback'] });
+      } catch {}
+
+      return fallback;
     }
   }
 
@@ -251,6 +431,7 @@ export class EnhancedAIService {
       // Build recommendation query
       const whereClause: any = {
         ownerId: { not: userId },
+        status: 'APPROVED',
       };
 
       if (category) {
@@ -346,15 +527,98 @@ export class EnhancedAIService {
           matchedTags,
           matchedCategory,
           avgRating,
+          image: item.images?.[0] || null,
+          images: item.images || [],
+          price: item.price,
+          description: item.description,
+          category: item.category,
+          location: item.location,
+          tags: item.tags || [],
+          reviewCount: item.reviews?.length || 0,
         };
       });
 
-      // Sort and return top results
+      // Sort by score
       const sorted = recommendations.sort((a, b) => b.score - a.score);
-      const top = sorted.slice(0, limit);
+      let top = sorted.slice(0, Math.max(limit * 2, 30)); // get a bigger pool for AI reranking
 
-      // If recommendations are low-confidence or empty, use AI to suggest keywords/categories and fetch matching items
-      const needAIFallback = top.length === 0 || top.every(r => r.score < 30);
+      // === Real AI-powered recommendation (main path when user has history) ===
+      if (preferredCategories.length > 0 || preferredTags.length > 0) {
+        try {
+          const aiProvider = AIProviderFactory.getProvider(this.provider);
+
+          // Prepare context for the LLM
+          const historySummary = `User likes these categories: ${preferredCategories.join(', ')}. Interested in tags: ${preferredTags.slice(0, 8).join(', ')}.`;
+
+          const candidateList = top.map((r, idx) => 
+            `${idx + 1}. ${r.title} (Tags: ${(r.matchedTags || []).join(', ') || 'none'})`
+          ).join('\n');
+
+          const prompt = `You are an expert product recommendation AI for a marketplace.
+
+User profile from past reviews:
+${historySummary}
+
+Here are ${top.length} candidate products:
+${candidateList}
+
+Task: Select the top ${limit} most suitable products for this user. For each selected product, give a short, natural, personalized reason (1 sentence max) explaining why it fits the user based on their history.
+
+Return ONLY a JSON array with this exact structure (no extra text):
+[
+  {"itemId": "the-id-from-above", "reason": "short personalized reason"},
+  ...
+]
+
+Choose only from the numbered list above. Be helpful and specific.`;
+
+          const aiResponse = await aiProvider.generateContent({
+            prompt,
+            type: 'chat',
+            maxTokens: 800,
+            temperature: 0.7,
+          });
+
+          let parsed: any[] = [];
+          try {
+            // Try to extract JSON from the response
+            const jsonMatch = aiResponse.content.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              parsed = JSON.parse(jsonMatch[0]);
+            }
+          } catch (parseErr) {
+            console.warn('Failed to parse AI recommendation JSON, falling back to scored list');
+          }
+
+          if (parsed.length > 0) {
+            // Map back to full recommendation objects
+            const aiRecs = parsed
+              .map(p => {
+                const original = top.find(r => r.itemId === p.itemId);
+                if (!original) return null;
+                return {
+                  ...original,
+                  reason: p.reason || original.reason,
+                  score: Math.max(original.score || 60, 75),
+                };
+              })
+              .filter((r): r is any => r !== null)
+              .slice(0, limit);
+
+            if (aiRecs.length > 0) {
+              return aiRecs;
+            }
+          }
+        } catch (aiErr) {
+          console.error('AI-powered recommendation failed, using algorithmic fallback:', aiErr);
+        }
+      }
+
+      // Fallback to original scored list (or pure AI keyword fallback if very low confidence)
+      const finalTop = top.slice(0, limit);
+
+      // Low confidence fallback using AI for keywords (kept from previous logic)
+      const needAIFallback = finalTop.length === 0 || finalTop.every(r => r.score < 30);
       if (needAIFallback) {
         try {
           const aiProvider = AIProviderFactory.getProvider(this.provider);
@@ -363,7 +627,6 @@ export class EnhancedAIService {
           const suggestions = (aiResponse.content || '').split(/[,\n;]+/).map(s => s.trim()).filter(Boolean).slice(0, limit * 2);
 
           if (suggestions.length > 0) {
-            // Build OR conditions from suggestions
             const orConditions: any[] = [];
             for (const s of suggestions) {
               orConditions.push({ title: { contains: s, mode: 'insensitive' } });
@@ -396,6 +659,14 @@ export class EnhancedAIService {
                   matchedTags: [],
                   matchedCategory: false,
                   avgRating,
+                  image: item.images?.[0] || null,
+                  images: item.images || [],
+                  price: item.price,
+                  description: item.description,
+                  category: item.category,
+                  location: item.location,
+                  tags: item.tags || [],
+                  reviewCount: item.reviews?.length || 0,
                 };
               });
 
@@ -407,7 +678,7 @@ export class EnhancedAIService {
         }
       }
 
-      return top;
+      return finalTop;
     } catch (error) {
       console.error('Recommendation generation error:', error);
       throw new ApiError(500, 'Failed to generate recommendations');
@@ -475,6 +746,72 @@ For now, you can browse our products, check reviews, or contact support for assi
     prompt += '\nTitle should be 5-10 words, clear, and appealing to customers.';
 
     return prompt;
+  }
+
+  private buildProductTagsPrompt(request: IContentGenerationRequest): string {
+    let prompt = `You are an expert e-commerce copywriter. Generate exactly 5 unique, catchy, and relevant product tags for the following item.`;
+
+    if (request.topic) {
+      prompt += `\nProduct: ${request.topic}`;
+    }
+    if (request.category) {
+      prompt += `\nCategory: ${request.category}`;
+    }
+    if (request.price) {
+      prompt += `\nPrice: ${request.price}`;
+    }
+    if (request.keywords && request.keywords.length > 0) {
+      prompt += `\nImportant keywords/features: ${request.keywords.join(', ')}`;
+    }
+
+    prompt += `
+
+Rules for the 5 tags:
+- Each tag must be 1 to 3 words max
+- Use Title Case, no spaces inside a tag (use CamelCase for multi-word, e.g. #WirelessHeadphones)
+- Always prefix with #
+- Highly relevant to the product, category and features
+- Diverse and useful for search & discovery (mix of category, benefit, style, audience)
+- Avoid generic words like "Premium", "Quality", "Best" unless truly fitting
+- Do NOT repeat any tag
+- Output ONLY the 5 tags separated by commas. No explanations, no numbering, no extra text.
+
+Example good output: #SmartWatch, #FitnessTracker, #HeartRate, #Waterproof, #LongBattery`;
+
+    return prompt;
+  }
+
+  private buildReviewCommentPrompt(productName: string, rating: number): string {
+    const name = productName || 'this product';
+    const stars = '★'.repeat(Math.max(1, Math.min(5, rating)));
+
+    let toneInstruction = '';
+    if (rating === 5) {
+      toneInstruction = 'Write an enthusiastic, genuine 5-star review. Mention specific positives like quality, value, or experience. Sound natural and happy.';
+    } else if (rating === 4) {
+      toneInstruction = 'Write a positive but realistic 4-star review. Highlight what you liked while noting one small area that could be better.';
+    } else if (rating === 3) {
+      toneInstruction = 'Write a balanced, honest 3-star review. Mention both good and average aspects without being overly negative.';
+    } else if (rating === 2) {
+      toneInstruction = 'Write a critical but fair 2-star review. Focus on specific disappointments while remaining respectful.';
+    } else {
+      toneInstruction = 'Write a honest 1-star review. Clearly explain the main problems encountered.';
+    }
+
+    return `You are a real customer who just bought and used "${name}".
+Rating given: ${rating}/5 ${stars}
+
+${toneInstruction}
+
+Rules:
+- 2-4 sentences max
+- Natural, conversational language (no marketing speak)
+- First person ("I", "my")
+- Specific but believable details
+- Do NOT start with "I bought" or "This product is"
+- End with a short recommendation or verdict
+
+Generate only the review text, nothing else.`;
   }
 
   setProvider(providerType: ProviderType): void {
