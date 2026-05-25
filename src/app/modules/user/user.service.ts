@@ -2,6 +2,7 @@ import prisma from '../../../config/database';
 import { IProfileUpdate, IUserProfile, IProfileStats } from './user.interface';
 import { UserRole } from '@prisma/client';
 import ApiError from '../../../errors/ApiError';
+import { uploadImage } from '../../../shared/cloudinary';
 
 const getUserProfile = async (userId: string): Promise<IUserProfile> => {
   console.log('🔍 Getting user profile for ID:', userId);
@@ -30,41 +31,55 @@ const getUserProfile = async (userId: string): Promise<IUserProfile> => {
 };
 
 const updateUserProfile = async (userId: string, payload: IProfileUpdate): Promise<IUserProfile> => {
-  console.log('🔄 Updating user profile for ID:', userId, payload);
+   console.log('🔄 Updating user profile for ID:', userId, payload);
 
-  // Check if user exists
-  const existingUser = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+   // Check if user exists
+   const existingUser = await prisma.user.findUnique({
+     where: { id: userId },
+   });
 
-  if (!existingUser) {
-    console.log('❌ User not found for update:', userId);
-    throw new ApiError(404, 'User not found');
-  }
+   if (!existingUser) {
+     console.log('❌ User not found for update:', userId);
+     throw new ApiError(404, 'User not found');
+   }
 
-  // Update user profile
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: payload.name,
-      bio: payload.bio,
-      profileImage: payload.profileImage,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      profileImage: true,
-      bio: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+   // Handle profile image upload to Cloudinary if it's a base64 string
+   let imageToUpdate = payload.profileImage;
+   if (payload.profileImage && typeof payload.profileImage === 'string' && payload.profileImage.startsWith('data:image')) {
+     console.log('📤 Detected base64 image, uploading to Cloudinary...');
+     try {
+       const uploadResult = await uploadImage(payload.profileImage, 'profile-images');
+       imageToUpdate = uploadResult.secure_url;
+       console.log('✅ Image uploaded to Cloudinary:', imageToUpdate);
+     } catch (error) {
+       console.error('❌ Cloudinary upload failed:', error);
+       throw new ApiError(500, 'Failed to upload profile image');
+     }
+   }
 
-  console.log('✅ User profile updated successfully:', updatedUser.name);
-  return updatedUser;
-};
+   // Update user profile
+   const updatedUser = await prisma.user.update({
+     where: { id: userId },
+     data: {
+       name: payload.name,
+       bio: payload.bio,
+       profileImage: imageToUpdate,
+     },
+     select: {
+       id: true,
+       name: true,
+       email: true,
+       role: true,
+       profileImage: true,
+       bio: true,
+       createdAt: true,
+       updatedAt: true,
+     },
+   });
+
+   console.log('✅ User profile updated successfully:', updatedUser.name);
+   return updatedUser;
+ };
 
 const getUserStats = async (userId: string): Promise<IProfileStats> => {
   console.log('📊 Getting user stats for ID:', userId);
