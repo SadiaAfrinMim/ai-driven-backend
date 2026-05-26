@@ -53,33 +53,35 @@ const aiService = {
     };
   },
 
-  async processChat(request: IChatRequest, userId: string): Promise<IChatResponse> {
-    const response = await enhancedAIService.processChat(request);
-    const conversationId = request.conversationId || `conv_${Date.now()}`;
+   async processChat(request: IChatRequest, userId?: string): Promise<IChatResponse> {
+     const response = await enhancedAIService.processChat(request);
+     const conversationId = request.conversationId || `conv_${Date.now()}`;
 
-    // Save to chat history (non-blocking - don't fail chat if DB write fails)
-    try {
-      await prisma.chatHistory.create({
-        data: {
-          message: request.message,
-          response,
-          userId,
-        },
-      });
-    } catch (dbError) {
-      console.warn('⚠️ Failed to save chat history (non-critical):', dbError);
-    }
+     // Save to chat history only if userId is provided (for authenticated users)
+     if (userId) {
+       try {
+         await prisma.chatHistory.create({
+           data: {
+             message: request.message,
+             response,
+             userId,
+           },
+         });
+       } catch (dbError) {
+         console.warn('⚠️ Failed to save chat history (non-critical):', dbError);
+       }
+     }
 
-    return {
-      response,
-      conversationId,
-      metadata: {
-        model: 'openai-gpt-4-turbo',
-        tokens: (request.message + response).split(' ').length,
-        responseTime: Date.now(),
-      },
-    };
-  },
+     return {
+       response,
+       conversationId,
+       metadata: {
+         model: 'openai-gpt-4-turbo',
+         tokens: (request.message + response).split(' ').length,
+         responseTime: Date.now(),
+       },
+     };
+   },
 
   async generateAnalytics(request: IAnalyticsRequest): Promise<IAnalyticsResponse> {
     const insights = [];

@@ -55,10 +55,10 @@ const getRecommendations = catchAsync(async (req: Request, res: Response) => {
 
 
 const chatWithAI = catchAsync(async (req: Request, res: Response) => {
-  const userId = (req as any).user.id;
+  const userId = (req as any).user?.id;
   const requestData: IChatRequest = req.body;
 
-  console.log('💬 Chat request from user:', userId, requestData.message.substring(0, 50) + '...');
+  console.log('💬 Chat request from user:', userId || 'public', requestData.message.substring(0, 50) + '...');
 
   const result = await aiService.processChat(requestData, userId);
 

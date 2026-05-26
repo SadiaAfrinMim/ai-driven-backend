@@ -25,6 +25,13 @@ router.post(
 // Public: AI review text generation (used in public product review form)
 router.post('/generate-review', aiController.generateReview);
 
+// Public chat endpoint (no authentication required)
+router.post(
+  '/chat-public',
+  validateRequest(aiValidations.chatValidationSchema),
+  aiController.chatWithAI
+);
+
 // Other authenticated routes
 router.use(auth()); // Apply auth middleware for all routes below
 
